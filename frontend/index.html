@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Based Smart Food Waste Management</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>AI-Based Smart Food Waste Management</h1>
+            <p class="subtitle">Reduce waste through precise ingredient planning</p>
+        </header>
+
+        <!-- Login/Register Section (hidden after login) -->
+        <div id="auth-section" class="auth-section">
+            <div class="auth-tabs">
+                <button class="tab-btn active" onclick="showLogin()">Login</button>
+                <button class="tab-btn" onclick="showRegister()">Register</button>
+            </div>
+            
+            <div id="login-form" class="auth-form active">
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="login-username">Username or Email</label>
+                        <input type="text" id="login-username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </div>
+            
+            <div id="register-form" class="auth-form">
+                <h2>Register</h2>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="register-username">Username</label>
+                        <input type="text" id="register-username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-household">Household Size</label>
+                        <input type="number" id="register-household" min="1" value="1" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main App Section (hidden before login) -->
+        <div id="app-section" class="app-section" style="display: none;">
+            <!-- Navigation -->
+            <nav class="nav">
+                <button class="nav-btn active" onclick="showSection('search')">Search Dish</button>
+                <button class="nav-btn" onclick="showSection('lists')">My Lists</button>
+                <button class="nav-btn" onclick="showSection('profile')">Profile</button>
+                <button class="nav-btn" onclick="logout()">Logout</button>
+            </nav>
+
+            <!-- Search Dish Section -->
+            <div id="search-section" class="section active">
+                <h2>Search for a Dish</h2>
+                <form id="dish-search-form">
+                    <div class="form-group">
+                        <label for="dish-name">Dish Name</label>
+                        <input type="text" id="dish-name" placeholder="e.g., Biryani, Pasta, Curry" required>
+                        <small>Enter the name of the dish you want to cook</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Search Recipe</button>
+                </form>
+
+                <!-- Recipe Results -->
+                <div id="recipe-results" class="recipe-results" style="display: none;">
+                    <h3>Recipe Found</h3>
+                    <div id="recipe-info"></div>
+                    
+                    <div class="form-group">
+                        <label for="household-size">Household Size (Number of People)</label>
+                        <input type="number" id="household-size" min="1" value="1" required>
+                        <small>This will scale the ingredients to match your household size</small>
+                    </div>
+                    
+                    <button onclick="generateGroceryList()" class="btn btn-success">Generate Grocery List</button>
+                    <button onclick="addToFavorites()" class="btn btn-secondary">Add to Favorites</button>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Searching for recipe...</p>
+                </div>
+
+                <!-- Error Message -->
+                <div id="error-message" class="error-message" style="display: none;"></div>
+            </div>
+
+            <!-- My Lists Section -->
+            <div id="lists-section" class="section">
+                <h2>My Grocery Lists</h2>
+                <div id="grocery-lists" class="grocery-lists">
+                    <p class="empty-state">No grocery lists yet. Search for a dish to get started!</p>
+                </div>
+            </div>
+
+            <!-- Profile Section -->
+            <div id="profile-section" class="section">
+                <h2>Profile Settings</h2>
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label for="profile-household">Household Size</label>
+                        <input type="number" id="profile-household" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="profile-dietary">Dietary Restrictions (comma-separated)</label>
+                        <input type="text" id="profile-dietary" placeholder="e.g., vegetarian, gluten-free">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Profile</button>
+                </form>
+                
+                <div class="favorites-section">
+                    <h3>Favorite Dishes</h3>
+                    <div id="favorite-dishes" class="favorite-dishes"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
+
