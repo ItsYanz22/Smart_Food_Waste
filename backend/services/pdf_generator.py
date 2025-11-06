@@ -15,7 +15,9 @@ class PDFGenerator:
     """Service for generating PDF grocery lists"""
     
     def __init__(self):
-        self.output_dir = 'static/pdfs'
+        # Get the directory where this file is located
+        current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.output_dir = os.path.join(current_dir, 'static', 'pdfs')
         os.makedirs(self.output_dir, exist_ok=True)
     
     def generate_pdf(self, grocery_list):

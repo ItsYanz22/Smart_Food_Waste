@@ -3,14 +3,22 @@ User profile and preferences routes
 """
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from mongoengine import connect
-from backend.models.user import User
-from backend.config import Config
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from models.user import User
+    from config import Config
+except ImportError:
+    from backend.models.user import User
+    from backend.config import Config
 
 bp = Blueprint('user', __name__)
 
-# Connect to MongoDB
-connect(host=Config.MONGO_URI)
+# MongoDB connection is handled in app.py - no need to connect here
 
 
 @bp.route('/profile', methods=['GET'])

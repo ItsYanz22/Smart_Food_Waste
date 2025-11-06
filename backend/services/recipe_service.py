@@ -4,25 +4,52 @@ Recipe service for fetching recipes from external APIs
 import requests
 import json
 from bs4 import BeautifulSoup
-from backend.config import Config
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 try:
-    from backend.services.ingredient_extractor import IngredientExtractor
+    from config import Config
+    from services.ingredient_extractor import IngredientExtractor
 except ImportError:
-    # Fallback if circular import
-    IngredientExtractor = None
+    try:
+        from backend.config import Config
+        from backend.services.ingredient_extractor import IngredientExtractor
+    except ImportError:
+        Config = None
+        IngredientExtractor = None
 
 
 class RecipeService:
     """Service for fetching and parsing recipes"""
     
     def __init__(self):
-        self.api_key = Config.GOOGLE_SEARCH_API_KEY
-        self.search_engine_id = Config.GOOGLE_SEARCH_ENGINE_ID
+        if Config:
+            self.api_key = Config.GOOGLE_SEARCH_API_KEY
+            self.search_engine_id = Config.GOOGLE_SEARCH_ENGINE_ID
+        else:
+            import os
+            from dotenv import load_dotenv
+            load_dotenv()
+            self.api_key = os.getenv('GOOGLE_SEARCH_API_KEY', '')
+            self.search_engine_id = os.getenv('GOOGLE_SEARCH_ENGINE_ID', '')
+        
         if IngredientExtractor:
             self.ingredient_extractor = IngredientExtractor()
         else:
-            from backend.services.ingredient_extractor import IngredientExtractor
-            self.ingredient_extractor = IngredientExtractor()
+            # Try to import directly
+            try:
+                from services.ingredient_extractor import IngredientExtractor
+                self.ingredient_extractor = IngredientExtractor()
+            except ImportError:
+                try:
+                    from backend.services.ingredient_extractor import IngredientExtractor
+                    self.ingredient_extractor = IngredientExtractor()
+                except ImportError:
+                    print("Warning: IngredientExtractor not available - recipe parsing may be limited")
+                    self.ingredient_extractor = None
     
     def fetch_recipe(self, dish_name):
         """
@@ -182,13 +209,22 @@ class RecipeService:
     
     def _fetch_from_spoonacular(self, dish_name):
         """Fallback to Spoonacular API if available"""
-        if not Config.SPOONACULAR_API_KEY:
+        spoonacular_key = ''
+        if Config:
+            spoonacular_key = Config.SPOONACULAR_API_KEY
+        else:
+            import os
+            from dotenv import load_dotenv
+            load_dotenv()
+            spoonacular_key = os.getenv('SPOONACULAR_API_KEY', '')
+        
+        if not spoonacular_key:
             return None
         
         try:
             url = "https://api.spoonacular.com/recipes/complexSearch"
             params = {
-                'apiKey': Config.SPOONACULAR_API_KEY,
+                'apiKey': spoonacular_key,
                 'query': dish_name,
                 'number': 1
             }
@@ -203,7 +239,7 @@ class RecipeService:
                     detail_url = f"https://api.spoonacular.com/recipes/{recipe_id}/information"
                     detail_response = requests.get(
                         detail_url,
-                        params={'apiKey': Config.SPOONACULAR_API_KEY},
+                        params={'apiKey': spoonacular_key},
                         timeout=10
                     )
                     

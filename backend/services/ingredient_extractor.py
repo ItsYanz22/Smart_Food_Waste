@@ -3,7 +3,19 @@ Ingredient extraction service using NLP and regex
 """
 import re
 from bs4 import BeautifulSoup
-from backend.models.ingredient import Ingredient
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from models.ingredient import Ingredient
+except ImportError:
+    try:
+        from backend.models.ingredient import Ingredient
+    except ImportError:
+        Ingredient = None  # Optional import
 
 
 class IngredientExtractor:

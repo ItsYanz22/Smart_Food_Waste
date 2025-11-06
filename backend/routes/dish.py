@@ -3,32 +3,47 @@ Dish and recipe routes
 """
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from mongoengine import connect
-from backend.models.dish import Dish
-from backend.models.recipe import Recipe
-from backend.config import Config
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from backend.services.recipe_service import RecipeService
-    from backend.ai_module.dish_recognizer import DishRecognizer
+    from models.dish import Dish
+    from models.recipe import Recipe
+    from config import Config
+    from services.recipe_service import RecipeService
+    import sys
+    # Add project root for ai_module
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from ai_module.dish_recognizer import DishRecognizer
 except ImportError:
-    RecipeService = None
-    DishRecognizer = None
+    try:
+        from backend.models.dish import Dish
+        from backend.models.recipe import Recipe
+        from backend.config import Config
+        from backend.services.recipe_service import RecipeService
+        from backend.ai_module.dish_recognizer import DishRecognizer
+    except ImportError:
+        Dish = None
+        Recipe = None
+        Config = None
+        RecipeService = None
+        DishRecognizer = None
 
 bp = Blueprint('dish', __name__)
 
-# Connect to MongoDB
-connect(host=Config.MONGO_URI)
+# MongoDB connection is handled in app.py - no need to connect here
 
 # Initialize services
 if RecipeService and DishRecognizer:
     recipe_service = RecipeService()
     dish_recognizer = DishRecognizer()
 else:
-    from backend.services.recipe_service import RecipeService
-    from backend.ai_module.dish_recognizer import DishRecognizer
-    recipe_service = RecipeService()
-    dish_recognizer = DishRecognizer()
+    print("Error: Could not import required services")
 
 
 @bp.route('/search', methods=['POST'])
@@ -110,7 +125,10 @@ def get_favorites():
     """Get user's favorite dishes"""
     try:
         user_id = get_jwt_identity()
-        from backend.models.user import User
+        try:
+            from models.user import User
+        except ImportError:
+            from backend.models.user import User
         
         user = User.objects(id=user_id).first()
         if not user:

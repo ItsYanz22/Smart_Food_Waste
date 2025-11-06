@@ -1,9 +1,26 @@
 """
 Seed database with sample data
 """
+import os
+import sys
+from dotenv import load_dotenv
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Load environment variables
+backend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend')
+env_path = os.path.join(backend_dir, '.env')
+load_dotenv(env_path)
+
 from mongoengine import connect
-from backend.config import Config
-from backend.models.ingredient import Ingredient
+
+# Import models
+try:
+    from backend.models.ingredient import Ingredient
+except ImportError:
+    sys.path.insert(0, backend_dir)
+    from models.ingredient import Ingredient
 
 
 def seed_ingredients():
@@ -96,9 +113,22 @@ def seed_ingredients():
 
 
 if __name__ == '__main__':
-    print("Connecting to MongoDB...")
-    connect(host=Config.MONGO_URI)
-    print("Connected!\n")
+    # Get MongoDB URI
+    mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/smart_waste_db')
+    
+    print("="*60)
+    print("Seeding Database")
+    print("="*60)
+    print(f"\nConnecting to MongoDB...")
+    
+    try:
+        connect(host=mongo_uri, serverSelectionTimeoutMS=5000)
+        print("✓ Connected!\n")
+    except Exception as e:
+        print(f"\n❌ Failed to connect to MongoDB!")
+        print(f"Error: {str(e)}")
+        print("\nMake sure MongoDB is running and MONGO_URI is correct in backend/.env")
+        sys.exit(1)
     
     seed_ingredients()
     

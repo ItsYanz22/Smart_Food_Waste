@@ -3,24 +3,40 @@ Grocery list routes
 """
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from mongoengine import connect
-from backend.models.grocery_list import GroceryList, GroceryItem
-from backend.models.recipe import Recipe
-from backend.config import Config
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from backend.services.grocery_list_builder import GroceryListBuilder
-    from backend.services.quantity_calculator import QuantityCalculator
-    from backend.services.pdf_generator import PDFGenerator
+    from models.grocery_list import GroceryList, GroceryItem
+    from models.recipe import Recipe
+    from config import Config
+    from services.grocery_list_builder import GroceryListBuilder
+    from services.quantity_calculator import QuantityCalculator
+    from services.pdf_generator import PDFGenerator
 except ImportError:
-    GroceryListBuilder = None
-    QuantityCalculator = None
-    PDFGenerator = None
+    try:
+        from backend.models.grocery_list import GroceryList, GroceryItem
+        from backend.models.recipe import Recipe
+        from backend.config import Config
+        from backend.services.grocery_list_builder import GroceryListBuilder
+        from backend.services.quantity_calculator import QuantityCalculator
+        from backend.services.pdf_generator import PDFGenerator
+    except ImportError as e:
+        print(f"Import error: {e}")
+        GroceryList = None
+        GroceryItem = None
+        Recipe = None
+        Config = None
+        GroceryListBuilder = None
+        QuantityCalculator = None
+        PDFGenerator = None
 
 bp = Blueprint('grocery', __name__)
 
-# Connect to MongoDB
-connect(host=Config.MONGO_URI)
+# MongoDB connection is handled in app.py - no need to connect here
 
 # Initialize services
 if GroceryListBuilder and QuantityCalculator and PDFGenerator:
@@ -28,12 +44,7 @@ if GroceryListBuilder and QuantityCalculator and PDFGenerator:
     quantity_calculator = QuantityCalculator()
     pdf_generator = PDFGenerator()
 else:
-    from backend.services.grocery_list_builder import GroceryListBuilder
-    from backend.services.quantity_calculator import QuantityCalculator
-    from backend.services.pdf_generator import PDFGenerator
-    grocery_builder = GroceryListBuilder()
-    quantity_calculator = QuantityCalculator()
-    pdf_generator = PDFGenerator()
+    print("Error: Could not import required services for grocery routes")
 
 
 @bp.route('/generate', methods=['POST'])

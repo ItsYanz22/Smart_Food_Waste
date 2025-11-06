@@ -3,20 +3,37 @@ Authentication routes
 """
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from mongoengine import connect
-from backend.models.user import User
-from backend.config import Config
-from backend.utils.validators import validate_email, validate_password
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from models.user import User
+    from config import Config
+    from utils.validators import validate_email, validate_password
+except ImportError:
+    from backend.models.user import User
+    from backend.config import Config
+    from backend.utils.validators import validate_email, validate_password
 
 bp = Blueprint('auth', __name__)
 
-# Connect to MongoDB
-connect(host=Config.MONGO_URI)
+# MongoDB connection is handled in app.py - no need to connect here
 
 
-@bp.route('/register', methods=['POST'])
+@bp.route('/register', methods=['POST', 'OPTIONS'])
 def register():
     """User registration endpoint"""
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        from flask import make_response
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8000')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response
     try:
         data = request.get_json()
         
@@ -67,9 +84,17 @@ def register():
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/login', methods=['POST'])
+@bp.route('/login', methods=['POST', 'OPTIONS'])
 def login():
     """User login endpoint"""
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        from flask import make_response
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8000')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response
     try:
         data = request.get_json()
         
