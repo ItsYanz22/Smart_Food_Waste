@@ -86,12 +86,19 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
  */
 const authAPI = {
     register: async (username, email, password, householdSize) => {
-        return apiRequest('/auth/register', 'POST', {
-            username: username.trim(),
-            email: email.trim().toLowerCase(),
-            password: password,
+        const data = {
+            username: username ? username.trim() : '',
+            email: email ? email.trim().toLowerCase() : '',
+            password: password || '',
             household_size: householdSize ? String(householdSize).trim() : '1'
+        };
+        
+        console.log('authAPI.register - Sending data:', {
+            ...data,
+            password: '***' // Don't log password
         });
+        
+        return apiRequest('/auth/register', 'POST', data);
     },
     
     login: async (username, password) => {
@@ -116,6 +123,12 @@ const dishAPI = {
         });
     },
     
+    extractFromUrl: async (recipeUrl) => {
+        return apiRequest('/dish/extract-url', 'POST', {
+            recipe_url: recipeUrl
+        });
+    },
+    
     getFavorites: async () => {
         return apiRequest('/dish/favorites', 'GET');
     },
@@ -124,6 +137,10 @@ const dishAPI = {
         return apiRequest('/dish/favorites', 'POST', {
             dish_name: dishName
         });
+    },
+    
+    downloadRecipePDF: async (recipeId) => {
+        return apiRequest(`/dish/recipe/${recipeId}/pdf`, 'GET');
     }
 };
 

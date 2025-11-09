@@ -37,14 +37,24 @@ def register():
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
     try:
+        # Debug: Log request details
+        print(f"\n=== REGISTRATION REQUEST ===")
+        print(f"Content-Type: {request.content_type}")
+        print(f"Method: {request.method}")
+        print(f"Headers: {dict(request.headers)}")
+        print(f"Raw data: {request.get_data(as_text=True)}")
+        
         # Get JSON data
         if not request.is_json:
+            print("ERROR: Not JSON content type")
             return jsonify({'error': 'Content-Type must be application/json'}), 400
         
         data = request.get_json()
+        print(f"Parsed JSON data: {data}")
         
         # Validate input
         if not data:
+            print("ERROR: No data provided")
             return jsonify({'error': 'No data provided'}), 400
         
         username = data.get('username', '').strip() if data.get('username') else ''
@@ -52,30 +62,47 @@ def register():
         password = data.get('password', '') if data.get('password') else ''
         household_size = data.get('household_size', '1')
         
+        print(f"Extracted values:")
+        print(f"  username: '{username}' (len={len(username)})")
+        print(f"  email: '{email}' (len={len(email)})")
+        print(f"  password: {'*' * len(password)} (len={len(password)})")
+        print(f"  household_size: '{household_size}'")
+        
         # Validate required fields
         if not username:
+            print("ERROR: Username is empty")
             return jsonify({'error': 'Username is required'}), 400
         
         if not email:
+            print("ERROR: Email is empty")
             return jsonify({'error': 'Email is required'}), 400
         
         if not password:
+            print("ERROR: Password is empty")
             return jsonify({'error': 'Password is required'}), 400
         
         # Validate email format
         if not validate_email(email):
+            print(f"ERROR: Invalid email format: '{email}'")
             return jsonify({'error': 'Invalid email format'}), 400
         
         # Validate password
         if not validate_password(password):
+            print(f"ERROR: Password too short: {len(password)} characters")
             return jsonify({'error': 'Password must be at least 6 characters'}), 400
         
         # Check if user already exists
-        if User.objects(username=username).first():
+        existing_user = User.objects(username=username).first()
+        if existing_user:
+            print(f"ERROR: Username '{username}' already exists")
             return jsonify({'error': 'Username already exists'}), 400
         
-        if User.objects(email=email).first():
+        existing_email = User.objects(email=email).first()
+        if existing_email:
+            print(f"ERROR: Email '{email}' already exists")
             return jsonify({'error': 'Email already exists'}), 400
+        
+        print("✓ All validations passed, creating user...")
         
         # Create new user
         try:

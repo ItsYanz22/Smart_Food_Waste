@@ -63,6 +63,11 @@
 
         <!-- Main App Section (hidden before login) -->
         <div id="app-section" class="app-section" style="display: none;">
+            <!-- Welcome Message -->
+            <div id="welcome-message" class="welcome-message">
+                <h2 id="welcome-text">Welcome Back!</h2>
+            </div>
+            
             <!-- Navigation -->
             <nav class="nav">
                 <button class="nav-btn active" onclick="showSection('search')">Search Dish</button>
@@ -74,13 +79,31 @@
             <!-- Search Dish Section -->
             <div id="search-section" class="section active">
                 <h2>Search for a Dish</h2>
-                <form id="dish-search-form">
+                
+                <!-- Tabs for Search Method -->
+                <div class="search-tabs">
+                    <button class="tab-btn active" onclick="switchSearchMethod('name')">Search by Name</button>
+                    <button class="tab-btn" onclick="switchSearchMethod('url')">Enter Recipe URL</button>
+                </div>
+                
+                <!-- Search by Name Form -->
+                <form id="dish-search-form" class="search-form active">
                     <div class="form-group">
                         <label for="dish-name">Dish Name</label>
                         <input type="text" id="dish-name" placeholder="e.g., Biryani, Pasta, Curry" required>
-                        <small>Enter the name of the dish you want to cook</small>
+                        <small>Enter the name of the dish you want to cook. We'll search Google for the recipe!</small>
                     </div>
                     <button type="submit" class="btn btn-primary">Search Recipe</button>
+                </form>
+                
+                <!-- Search by URL Form -->
+                <form id="recipe-url-form" class="search-form" style="display: none;">
+                    <div class="form-group">
+                        <label for="recipe-url">Recipe URL</label>
+                        <input type="url" id="recipe-url" placeholder="https://example.com/recipe" required>
+                        <small>Paste a recipe URL from any website. We'll extract the ingredients automatically!</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Extract Recipe</button>
                 </form>
 
                 <!-- Recipe Results -->
@@ -94,8 +117,11 @@
                         <small>This will scale the ingredients to match your household size</small>
                     </div>
                     
-                    <button onclick="generateGroceryList()" class="btn btn-success">Generate Grocery List</button>
-                    <button onclick="addToFavorites()" class="btn btn-secondary">Add to Favorites</button>
+                    <div class="recipe-actions">
+                        <button onclick="generateGroceryList()" class="btn btn-success">Generate Grocery List</button>
+                        <button onclick="addToFavorites()" class="btn btn-secondary">Add to Favorites</button>
+                        <button onclick="downloadRecipePDF()" class="btn btn-primary">Download Recipe PDF</button>
+                    </div>
                 </div>
 
                 <!-- Loading Indicator -->

@@ -53,6 +53,55 @@ def search_dish():
     try:
         data = request.get_json()
         dish_name = data.get('dish_name', '').strip()
+        recipe_url = data.get('recipe_url', '').strip()
+        
+        # If URL is provided, extract recipe from URL
+        if recipe_url:
+            # Extract recipe from URL using recipe service
+            recipe_data = recipe_service._parse_recipe_page(recipe_url, '')
+            
+            if not recipe_data:
+                return jsonify({'error': 'Could not extract recipe from URL. Please try a different URL.'}), 404
+            
+            # Extract dish name from URL or use a default
+            dish_name = recipe_data.get('dish_name', '')
+            if not dish_name:
+                dish_name = 'Custom Recipe'
+            
+            # Normalize dish name
+            normalized_name = dish_recognizer.normalize_dish_name(dish_name)
+            
+            # Create or update dish
+            dish = Dish.objects(normalized_name=normalized_name).first()
+            if not dish:
+                dish = Dish(
+                    name=dish_name,
+                    normalized_name=normalized_name,
+                    servings=recipe_data.get('servings', 4)
+                )
+                dish.save()
+            
+            # Create or update recipe
+            recipe = Recipe(
+                dish_name=dish_name,
+                source_url=recipe_url,
+                source_type='manual',
+                servings=recipe_data.get('servings', 4),
+                ingredients=recipe_data.get('ingredients', []),
+                instructions=recipe_data.get('instructions', []),
+                raw_data=recipe_data.get('raw_data', {})
+            )
+            recipe.save()
+            
+            # Link recipe to dish
+            dish.recipe_id = str(recipe.id)
+            dish.save()
+            
+            return jsonify({
+                'dish': dish.to_dict(),
+                'recipe': recipe.to_dict(),
+                'from_cache': False
+            }), 200
         
         if not dish_name:
             return jsonify({'error': 'Dish name is required'}), 400
@@ -113,6 +162,108 @@ def search_dish():
             'dish': dish.to_dict(),
             'recipe': recipe.to_dict(),
             'from_cache': False
+        }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/extract-url', methods=['POST'])
+@jwt_required()
+def extract_recipe_from_url():
+    """Extract recipe from a URL"""
+    try:
+        data = request.get_json()
+        recipe_url = data.get('recipe_url', '').strip()
+        
+        if not recipe_url:
+            return jsonify({'error': 'Recipe URL is required'}), 400
+        
+        # Parse recipe from URL
+        recipe_data = recipe_service._parse_recipe_page(recipe_url, '')
+        
+        if not recipe_data:
+            return jsonify({'error': 'Could not extract recipe from URL. Please try a different URL.'}), 404
+        
+        # Extract dish name from URL or use a default
+        dish_name = recipe_data.get('dish_name', '')
+        if not dish_name:
+            # Try to extract from URL or use a generic name
+            dish_name = 'Custom Recipe'
+        
+        # Normalize dish name
+        normalized_name = dish_recognizer.normalize_dish_name(dish_name)
+        
+        # Create or update dish
+        dish = Dish.objects(normalized_name=normalized_name).first()
+        if not dish:
+            dish = Dish(
+                name=dish_name,
+                normalized_name=normalized_name,
+                servings=recipe_data.get('servings', 4)
+            )
+            dish.save()
+        
+        # Create or update recipe
+        recipe = Recipe(
+            dish_name=dish_name,
+            source_url=recipe_url,
+            source_type='manual',
+            servings=recipe_data.get('servings', 4),
+            ingredients=recipe_data.get('ingredients', []),
+            instructions=recipe_data.get('instructions', []),
+            raw_data=recipe_data.get('raw_data', {})
+        )
+        recipe.save()
+        
+        # Link recipe to dish
+        dish.recipe_id = str(recipe.id)
+        dish.save()
+        
+        return jsonify({
+            'dish': dish.to_dict(),
+            'recipe': recipe.to_dict(),
+            'from_cache': False
+        }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/recipe/<recipe_id>/pdf', methods=['GET'])
+@jwt_required()
+def download_recipe_pdf(recipe_id):
+    """Download recipe as PDF"""
+    try:
+        from services.pdf_generator import PDFGenerator
+        
+        recipe = Recipe.objects(id=recipe_id).first()
+        if not recipe:
+            return jsonify({'error': 'Recipe not found'}), 404
+        
+        # Create a temporary grocery list structure for PDF generation
+        class TempGroceryList:
+            def __init__(self, recipe):
+                self.id = recipe.id
+                self.dish_name = recipe.dish_name
+                self.household_size = recipe.servings
+                self.items = [
+                    type('Item', (), {
+                        'ingredient_name': ing.name,
+                        'quantity': ing.quantity,
+                        'unit': ing.unit,
+                        'category': ing.category or 'other'
+                    })() for ing in recipe.ingredients
+                ]
+                self.notes = f"Recipe from {recipe.source_url}" if recipe.source_url else ""
+        
+        temp_list = TempGroceryList(recipe)
+        pdf_generator = PDFGenerator()
+        pdf_path = pdf_generator.generate_pdf(temp_list)
+        
+        return jsonify({
+            'pdf_url': pdf_path,
+            'message': 'Recipe PDF generated successfully'
         }), 200
     
     except Exception as e:

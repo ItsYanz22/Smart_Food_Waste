@@ -40,6 +40,15 @@ function showAuth() {
 function showApp() {
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('app-section').style.display = 'block';
+    
+    // Show welcome message with username
+    const user = getCurrentUser();
+    if (user && user.username) {
+        const welcomeText = document.getElementById('welcome-text');
+        if (welcomeText) {
+            welcomeText.textContent = `Welcome Back, ${user.username}!`;
+        }
+    }
 }
 
 /**
@@ -62,6 +71,12 @@ function setupFormHandlers() {
     const dishSearchForm = document.getElementById('dish-search-form');
     if (dishSearchForm) {
         dishSearchForm.addEventListener('submit', handleDishSearch);
+    }
+    
+    // Recipe URL form
+    const recipeUrlForm = document.getElementById('recipe-url-form');
+    if (recipeUrlForm) {
+        recipeUrlForm.addEventListener('submit', handleRecipeUrl);
     }
     
     // Profile form
@@ -143,8 +158,24 @@ async function handleRegister(e) {
         showLoading();
         if (submitBtn) submitBtn.disabled = true;
         
+        // Debug: Log what we're sending
+        console.log('=== REGISTRATION REQUEST ===');
+        console.log('Username:', username);
+        console.log('Email:', email);
+        console.log('Password length:', password.length);
+        console.log('Household Size:', householdSize);
+        
+        const requestData = {
+            username: username.trim(),
+            email: email.trim().toLowerCase(),
+            password: password,
+            household_size: householdSize ? String(householdSize).trim() : '1'
+        };
+        console.log('Request data:', requestData);
+        
         const result = await authAPI.register(username, email, password, householdSize);
         
+        console.log('Registration success:', result);
         setToken(result.access_token);
         setCurrentUser(result.user);
         
@@ -152,6 +183,10 @@ async function handleRegister(e) {
         showSuccess('Registration successful!');
     } catch (error) {
         console.error('Registration error:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack
+        });
         showError(error.message || 'Registration failed. Please try again.');
     } finally {
         hideLoading();
@@ -165,7 +200,7 @@ async function handleRegister(e) {
 async function handleDishSearch(e) {
     e.preventDefault();
     
-    const dishName = document.getElementById('dish-name').value;
+    const dishName = document.getElementById('dish-name').value.trim();
     
     if (!dishName) {
         showError('Please enter a dish name');
@@ -180,9 +215,101 @@ async function handleDishSearch(e) {
         const result = await dishAPI.search(dishName);
         
         displayRecipeResults(result);
-        showSuccess('Recipe found!');
+        showSuccess('Recipe found! Ingredients have been saved to the database.');
     } catch (error) {
         showError(error.message || 'Recipe not found. Please try a different dish name.');
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Handle recipe URL submission
+ */
+async function handleRecipeUrl(e) {
+    e.preventDefault();
+    
+    const recipeUrl = document.getElementById('recipe-url').value.trim();
+    
+    if (!recipeUrl) {
+        showError('Please enter a recipe URL');
+        return;
+    }
+    
+    // Basic URL validation
+    try {
+        new URL(recipeUrl);
+    } catch (error) {
+        showError('Please enter a valid URL');
+        return;
+    }
+    
+    try {
+        showLoading();
+        document.getElementById('recipe-results').style.display = 'none';
+        document.getElementById('error-message').style.display = 'none';
+        
+        const result = await dishAPI.extractFromUrl(recipeUrl);
+        
+        displayRecipeResults(result);
+        showSuccess('Recipe extracted! Ingredients have been saved to the database.');
+    } catch (error) {
+        showError(error.message || 'Could not extract recipe from URL. Please try a different URL.');
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Switch between search methods
+ * Made global for onclick handlers
+ */
+window.switchSearchMethod = function(method) {
+    const nameForm = document.getElementById('dish-search-form');
+    const urlForm = document.getElementById('recipe-url-form');
+    const tabs = document.querySelectorAll('.search-tabs .tab-btn');
+    
+    if (!nameForm || !urlForm) {
+        console.error('Search forms not found');
+        return;
+    }
+    
+    if (method === 'name') {
+        nameForm.style.display = 'block';
+        urlForm.style.display = 'none';
+        if (tabs.length >= 2) {
+            tabs[0].classList.add('active');
+            tabs[1].classList.remove('active');
+        }
+    } else {
+        nameForm.style.display = 'none';
+        urlForm.style.display = 'block';
+        if (tabs.length >= 2) {
+            tabs[0].classList.remove('active');
+            tabs[1].classList.add('active');
+        }
+    }
+};
+
+/**
+ * Download recipe PDF
+ * Made global for onclick handlers
+ */
+window.downloadRecipePDF = async function() {
+    if (!currentRecipeId) {
+        showError('No recipe selected');
+        return;
+    }
+    
+    try {
+        showLoading();
+        const result = await dishAPI.downloadRecipePDF(currentRecipeId);
+        if (result.pdf_url) {
+            window.open(result.pdf_url, '_blank');
+            showSuccess('Recipe PDF downloaded!');
+        }
+    } catch (error) {
+        showError(error.message || 'Failed to download recipe PDF');
     } finally {
         hideLoading();
     }
@@ -223,8 +350,9 @@ async function handleProfileUpdate(e) {
 
 /**
  * Logout
+ * Made global for onclick handlers
  */
-function logout() {
+window.logout = function() {
     removeToken();
     removeCurrentUser();
     showAuth();

@@ -27,8 +27,9 @@ function showRegister() {
 
 /**
  * Show section
+ * Made global for onclick handlers
  */
-function showSection(sectionName) {
+window.showSection = function(sectionName) {
     // Hide all sections
     document.querySelectorAll('.section').forEach(section => {
         section.classList.remove('active');
@@ -45,7 +46,9 @@ function showSection(sectionName) {
         btn.classList.remove('active');
     });
     
-    event.target.classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
     
     // Load data if needed
     if (sectionName === 'lists') {
@@ -53,7 +56,7 @@ function showSection(sectionName) {
     } else if (sectionName === 'profile') {
         loadProfile();
     }
-}
+};
 
 /**
  * Display recipe results
@@ -72,8 +75,9 @@ function displayRecipeResults(recipeData) {
         <div class="recipe-info">
             <h4>${recipeData.dish.name}</h4>
             <p><strong>Servings:</strong> ${currentRecipe.servings}</p>
+            ${currentRecipe.source_url ? `<p><strong>Source:</strong> <a href="${currentRecipe.source_url}" target="_blank">${currentRecipe.source_url}</a></p>` : ''}
             <div class="ingredients-section">
-                <h5>Ingredients:</h5>
+                <h5>Ingredients (automatically saved to database):</h5>
                 <ul class="ingredient-list">
     `;
     
@@ -86,11 +90,24 @@ function displayRecipeResults(recipeData) {
         `;
     });
     
-    html += `
+    // Add instructions if available
+    if (currentRecipe.instructions && currentRecipe.instructions.length > 0) {
+        html += `
                 </ul>
             </div>
-        </div>
-    `;
+            <div class="instructions-section">
+                <h5>Instructions:</h5>
+                <ol class="instruction-list">
+        `;
+        currentRecipe.instructions.forEach((instruction, index) => {
+            html += `<li>${instruction}</li>`;
+        });
+        html += `</ol></div>`;
+    } else {
+        html += `</ul></div>`;
+    }
+    
+    html += `</div>`;
     
     infoDiv.innerHTML = html;
     resultsDiv.style.display = 'block';
@@ -104,8 +121,9 @@ function displayRecipeResults(recipeData) {
 
 /**
  * Generate grocery list
+ * Made global for onclick handlers
  */
-async function generateGroceryList() {
+window.generateGroceryList = async function() {
     if (!currentRecipe) {
         showError('Please search for a recipe first');
         return;
@@ -136,8 +154,9 @@ async function generateGroceryList() {
 
 /**
  * Add dish to favorites
+ * Made global for onclick handlers
  */
-async function addToFavorites() {
+window.addToFavorites = async function() {
     if (!currentRecipe) {
         showError('No recipe selected');
         return;
