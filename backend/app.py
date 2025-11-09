@@ -116,7 +116,19 @@ import os
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    """Serve static files"""
+    """Serve static files including subdirectories"""
+    import os
+    # Handle subdirectories like pdfs/recipes/file.pdf
+    if '/' in filename:
+        # Split into directory and file
+        parts = filename.split('/')
+        directory = '/'.join(parts[:-1])
+        file = parts[-1]
+        static_dir = os.path.join(os.path.dirname(__file__), 'static', directory)
+        if os.path.exists(static_dir):
+            return send_from_directory(static_dir, file)
+    
+    # Default: serve from static root
     return send_from_directory('static', filename)
 
 if __name__ == '__main__':

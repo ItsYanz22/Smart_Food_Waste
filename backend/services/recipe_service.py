@@ -31,6 +31,24 @@ except ImportError:
     except ImportError:
         _ingredient_extractor_class = None
 
+# Try to import NLPProcessor
+_nlp_processor_class = None
+try:
+    import sys
+    import os
+    # Add project root for ai_module
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from ai_module.nlp_processor import NLPProcessor
+    _nlp_processor_class = NLPProcessor
+except ImportError:
+    try:
+        from backend.ai_module.nlp_processor import NLPProcessor
+        _nlp_processor_class = NLPProcessor
+    except ImportError:
+        _nlp_processor_class = None
+
 
 class RecipeService:
     """Service for fetching and parsing recipes"""
@@ -56,6 +74,17 @@ class RecipeService:
         else:
             print("Warning: IngredientExtractor not available - recipe parsing may be limited")
             self.ingredient_extractor = None
+        
+        # Initialize NLP processor
+        if _nlp_processor_class:
+            try:
+                self.nlp_processor = _nlp_processor_class()
+            except Exception as e:
+                print(f"Warning: Could not initialize NLPProcessor: {e}")
+                self.nlp_processor = None
+        else:
+            print("Warning: NLPProcessor not available - NLP processing will be skipped")
+            self.nlp_processor = None
     
     def fetch_recipe(self, dish_name):
         """
@@ -127,32 +156,67 @@ class RecipeService:
             
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Extract ingredients using ingredient extractor
-            if self.ingredient_extractor:
+            # Get raw HTML content for NLP processing
+            raw_html_content = str(soup)
+            raw_text_content = soup.get_text(separator='\n', strip=True)
+            
+            # Process with NLP model if available
+            nlp_processed = None
+            if self.nlp_processor:
+                try:
+                    # Use HTML content for better structure extraction
+                    nlp_processed = self.nlp_processor.process_recipe_text(raw_html_content)
+                except Exception as e:
+                    print(f"Warning: NLP processing failed: {e}")
+                    # Fallback to text content
+                    try:
+                        nlp_processed = self.nlp_processor.process_recipe_text(raw_text_content)
+                    except Exception as e2:
+                        print(f"Warning: NLP processing with text also failed: {e2}")
+            
+            # Extract ingredients - prefer NLP processed, fallback to extractor
+            if nlp_processed and nlp_processed.get('ingredients'):
+                ingredients = nlp_processed['ingredients']
+            elif self.ingredient_extractor:
                 ingredients = self.ingredient_extractor.extract_from_html(soup)
             else:
                 # Fallback: basic ingredient extraction
                 ingredients = self._basic_ingredient_extraction(soup)
             
-            # Extract instructions
-            instructions = self._extract_instructions(soup)
+            # Extract instructions - prefer NLP processed, fallback to extractor
+            if nlp_processed and nlp_processed.get('steps'):
+                instructions = nlp_processed['steps']
+            else:
+                instructions = self._extract_instructions(soup)
             
             # Extract serving size
             servings = self._extract_servings(soup)
             
+            # Use NLP title if available, otherwise use dish_name
+            recipe_title = dish_name
+            if nlp_processed and nlp_processed.get('title'):
+                recipe_title = nlp_processed['title']
+            
             if not ingredients:
                 return None
             
-            return {
-                'dish_name': dish_name,
+            result = {
+                'dish_name': recipe_title or dish_name,
                 'ingredients': ingredients,
                 'instructions': instructions,
                 'servings': servings,
                 'raw_data': {
                     'url': url,
-                    'html_preview': soup.get_text()[:500]  # First 500 chars
+                    'html_preview': soup.get_text()[:500],  # First 500 chars
+                    'nlp_processed': nlp_processed  # Store NLP processed data
                 }
             }
+            
+            # Add summary if available from NLP
+            if nlp_processed and nlp_processed.get('summary'):
+                result['summary'] = nlp_processed['summary']
+            
+            return result
         
         except Exception as e:
             print(f"Error parsing recipe page: {str(e)}")

@@ -90,11 +90,21 @@ function displayRecipeResults(recipeData) {
         `;
     });
     
+    html += `</ul></div>`;
+    
+    // Add summary if available
+    if (currentRecipe.summary) {
+        html += `
+            <div class="summary-section">
+                <h5>Summary:</h5>
+                <p>${currentRecipe.summary}</p>
+            </div>
+        `;
+    }
+    
     // Add instructions if available
     if (currentRecipe.instructions && currentRecipe.instructions.length > 0) {
         html += `
-                </ul>
-            </div>
             <div class="instructions-section">
                 <h5>Instructions:</h5>
                 <ol class="instruction-list">
@@ -103,8 +113,6 @@ function displayRecipeResults(recipeData) {
             html += `<li>${instruction}</li>`;
         });
         html += `</ol></div>`;
-    } else {
-        html += `</ul></div>`;
     }
     
     html += `</div>`;

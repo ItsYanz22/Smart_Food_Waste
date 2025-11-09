@@ -140,7 +140,11 @@ const dishAPI = {
     },
     
     downloadRecipePDF: async (recipeId) => {
-        return apiRequest(`/dish/recipe/${recipeId}/pdf`, 'GET');
+        return apiRequest(`/dish/recipe/${recipeId}/download/pdf`, 'GET');
+    },
+    
+    downloadIngredientsPDF: async (recipeId) => {
+        return apiRequest(`/dish/ingredients/${recipeId}/download/pdf`, 'GET');
     }
 };
 

@@ -436,3 +436,33 @@ body {
     margin-bottom: 10px;
 }
 
+/* Summary Section */
+.summary-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: #e8f4f8;
+    border-radius: 8px;
+    border-left: 4px solid #3498db;
+}
+
+.summary-section h5 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.summary-section p {
+    color: #555;
+    line-height: 1.6;
+}
+
+/* Info button style */
+.btn-info {
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+}
+
+.btn-info:hover {
+    background-color: #138496;
+}
+

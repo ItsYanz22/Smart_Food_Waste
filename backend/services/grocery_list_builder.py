@@ -33,13 +33,22 @@ class GroceryListBuilder:
         })
         
         for ingredient in ingredients:
-            name = ingredient.get('name', '').strip().lower()
+            # Handle both dictionary and object
+            if hasattr(ingredient, 'name'):
+                # It's an object (IngredientItem)
+                name = (ingredient.name or '').strip().lower()
+                quantity = str(ingredient.quantity or '1')
+                unit = (ingredient.unit or '').lower()
+                category = ingredient.category or 'other'
+            else:
+                # It's a dictionary
+                name = ingredient.get('name', '').strip().lower()
+                quantity = ingredient.get('quantity', '1')
+                unit = ingredient.get('unit', '').lower()
+                category = ingredient.get('category', 'other')
+            
             if not name:
                 continue
-            
-            quantity = ingredient.get('quantity', '1')
-            unit = ingredient.get('unit', '').lower()
-            category = ingredient.get('category', 'other')
             
             if name in ingredient_map:
                 # Add quantity to existing ingredient

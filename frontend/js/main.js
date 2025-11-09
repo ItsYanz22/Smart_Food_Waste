@@ -306,10 +306,34 @@ window.downloadRecipePDF = async function() {
         const result = await dishAPI.downloadRecipePDF(currentRecipeId);
         if (result.pdf_url) {
             window.open(result.pdf_url, '_blank');
-            showSuccess('Recipe PDF downloaded!');
+            showSuccess('Recipe steps PDF downloaded!');
         }
     } catch (error) {
         showError(error.message || 'Failed to download recipe PDF');
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Download ingredients PDF
+ * Made global for onclick handlers
+ */
+window.downloadIngredientsPDF = async function() {
+    if (!currentRecipeId) {
+        showError('No recipe selected');
+        return;
+    }
+    
+    try {
+        showLoading();
+        const result = await dishAPI.downloadIngredientsPDF(currentRecipeId);
+        if (result.pdf_url) {
+            window.open(result.pdf_url, '_blank');
+            showSuccess('Ingredients PDF downloaded!');
+        }
+    } catch (error) {
+        showError(error.message || 'Failed to download ingredients PDF');
     } finally {
         hideLoading();
     }

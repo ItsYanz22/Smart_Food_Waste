@@ -31,6 +31,10 @@ class Recipe(Document):
     # Instructions (stored as list of strings)
     instructions = ListField(StringField(), default=list)
     
+    # NLP processed fields
+    summary = StringField()  # Recipe summary from NLP processing
+    title = StringField()  # Recipe title from NLP processing
+    
     # Raw recipe data (for debugging/reprocessing)
     raw_data = DictField()
     
@@ -46,7 +50,7 @@ class Recipe(Document):
     
     def to_dict(self):
         """Convert recipe to dictionary"""
-        return {
+        result = {
             'id': str(self.id),
             'dish_name': self.dish_name,
             'source_url': self.source_url,
@@ -68,5 +72,13 @@ class Recipe(Document):
             'created_at': self.created_at.isoformat(),
             'times_accessed': self.times_accessed
         }
+        
+        # Add NLP fields if available (backward compatible)
+        if self.summary:
+            result['summary'] = self.summary
+        if self.title:
+            result['title'] = self.title
+        
+        return result
 
 

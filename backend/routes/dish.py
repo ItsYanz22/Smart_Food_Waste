@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     from models.dish import Dish
-    from models.recipe import Recipe
+    from models.recipe import Recipe, IngredientItem
+    from models.ingredient import Ingredient
     from config import Config
     from services.recipe_service import RecipeService
     import sys
@@ -20,19 +21,25 @@ try:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     from ai_module.dish_recognizer import DishRecognizer
+    from ai_module.nlp_processor import NLPProcessor
 except ImportError:
     try:
         from backend.models.dish import Dish
-        from backend.models.recipe import Recipe
+        from backend.models.recipe import Recipe, IngredientItem
+        from backend.models.ingredient import Ingredient
         from backend.config import Config
         from backend.services.recipe_service import RecipeService
         from backend.ai_module.dish_recognizer import DishRecognizer
+        from backend.ai_module.nlp_processor import NLPProcessor
     except ImportError:
         Dish = None
         Recipe = None
+        IngredientItem = None
+        Ingredient = None
         Config = None
         RecipeService = None
         DishRecognizer = None
+        NLPProcessor = None
 
 bp = Blueprint('dish', __name__)
 
@@ -42,8 +49,98 @@ bp = Blueprint('dish', __name__)
 if RecipeService and DishRecognizer:
     recipe_service = RecipeService()
     dish_recognizer = DishRecognizer()
+    nlp_processor = NLPProcessor() if NLPProcessor else None
 else:
     print("Error: Could not import required services")
+    nlp_processor = None
+
+
+def convert_ingredients_to_items(ingredients_data):
+    """
+    Convert ingredient dictionaries to IngredientItem embedded documents
+    
+    Args:
+        ingredients_data: List of ingredient dictionaries
+    
+    Returns:
+        List of IngredientItem objects
+    """
+    ingredient_items = []
+    for ing in ingredients_data:
+        if isinstance(ing, dict):
+            item = IngredientItem(
+                name=ing.get('name', ''),
+                quantity=str(ing.get('quantity', '1')),
+                unit=ing.get('unit', ''),
+                category=ing.get('category')
+            )
+            ingredient_items.append(item)
+        elif isinstance(ing, IngredientItem):
+            ingredient_items.append(ing)
+    return ingredient_items
+
+
+def auto_expand_ingredients(ingredients_data):
+    """
+    Automatically add new ingredients to the Ingredient collection
+    
+    Args:
+        ingredients_data: List of ingredient dictionaries or IngredientItem objects
+    """
+    if not Ingredient:
+        return
+    
+    import logging
+    import os
+    
+    # Setup logging for ingredient updates
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'ingredients_updates.log')
+    
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    
+    added_count = 0
+    for ing in ingredients_data:
+        # Extract ingredient name
+        if isinstance(ing, dict):
+            ingredient_name = ing.get('name', '').strip()
+        elif isinstance(ing, IngredientItem):
+            ingredient_name = ing.name.strip()
+        else:
+            continue
+        
+        if not ingredient_name:
+            continue
+        
+        # Normalize name for matching
+        if nlp_processor:
+            normalized_name = nlp_processor.normalize_text(ingredient_name)
+        else:
+            normalized_name = ingredient_name.lower().strip()
+        
+        # Check if ingredient already exists
+        existing = Ingredient.objects(normalized_name=normalized_name).first()
+        if not existing:
+            # Create new ingredient
+            try:
+                new_ingredient = Ingredient(
+                    name=ingredient_name,
+                    normalized_name=normalized_name,
+                    category="Uncategorized"
+                )
+                new_ingredient.save()
+                added_count += 1
+                logging.info(f"Added new ingredient: {ingredient_name} (normalized: {normalized_name})")
+            except Exception as e:
+                logging.error(f"Failed to add ingredient {ingredient_name}: {str(e)}")
+    
+    if added_count > 0:
+        logging.info(f"Auto-expanded ingredients: {added_count} new ingredients added")
 
 
 @bp.route('/search', methods=['POST'])
@@ -81,14 +178,22 @@ def search_dish():
                 )
                 dish.save()
             
+            # Convert ingredients to IngredientItem format
+            ingredients_list = convert_ingredients_to_items(recipe_data.get('ingredients', []))
+            
+            # Auto-expand ingredient list
+            auto_expand_ingredients(ingredients_list)
+            
             # Create or update recipe
             recipe = Recipe(
                 dish_name=dish_name,
                 source_url=recipe_url,
                 source_type='manual',
                 servings=recipe_data.get('servings', 4),
-                ingredients=recipe_data.get('ingredients', []),
+                ingredients=ingredients_list,
                 instructions=recipe_data.get('instructions', []),
+                summary=recipe_data.get('summary'),
+                title=recipe_data.get('title'),
                 raw_data=recipe_data.get('raw_data', {})
             )
             recipe.save()
@@ -142,14 +247,22 @@ def search_dish():
             )
             dish.save()
         
+        # Convert ingredients to IngredientItem format
+        ingredients_list = convert_ingredients_to_items(recipe_data.get('ingredients', []))
+        
+        # Auto-expand ingredient list
+        auto_expand_ingredients(ingredients_list)
+        
         # Create or update recipe
         recipe = Recipe(
             dish_name=dish_name,
             source_url=recipe_data.get('source_url', ''),
             source_type=recipe_data.get('source_type', 'google_search'),
             servings=recipe_data.get('servings', 4),
-            ingredients=recipe_data.get('ingredients', []),
+            ingredients=ingredients_list,
             instructions=recipe_data.get('instructions', []),
+            summary=recipe_data.get('summary'),
+            title=recipe_data.get('title'),
             raw_data=recipe_data.get('raw_data', {})
         )
         recipe.save()
@@ -230,10 +343,10 @@ def extract_recipe_from_url():
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/recipe/<recipe_id>/pdf', methods=['GET'])
+@bp.route('/recipe/<recipe_id>/download/pdf', methods=['GET'])
 @jwt_required()
 def download_recipe_pdf(recipe_id):
-    """Download recipe as PDF"""
+    """Download recipe steps/instructions as PDF"""
     try:
         from services.pdf_generator import PDFGenerator
         
@@ -241,29 +354,35 @@ def download_recipe_pdf(recipe_id):
         if not recipe:
             return jsonify({'error': 'Recipe not found'}), 404
         
-        # Create a temporary grocery list structure for PDF generation
-        class TempGroceryList:
-            def __init__(self, recipe):
-                self.id = recipe.id
-                self.dish_name = recipe.dish_name
-                self.household_size = recipe.servings
-                self.items = [
-                    type('Item', (), {
-                        'ingredient_name': ing.name,
-                        'quantity': ing.quantity,
-                        'unit': ing.unit,
-                        'category': ing.category or 'other'
-                    })() for ing in recipe.ingredients
-                ]
-                self.notes = f"Recipe from {recipe.source_url}" if recipe.source_url else ""
-        
-        temp_list = TempGroceryList(recipe)
         pdf_generator = PDFGenerator()
-        pdf_path = pdf_generator.generate_pdf(temp_list)
+        pdf_path = pdf_generator.generate_recipe_steps_pdf(recipe)
         
         return jsonify({
             'pdf_url': pdf_path,
-            'message': 'Recipe PDF generated successfully'
+            'message': 'Recipe steps PDF generated successfully'
+        }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/ingredients/<recipe_id>/download/pdf', methods=['GET'])
+@jwt_required()
+def download_ingredients_pdf(recipe_id):
+    """Download recipe ingredients as PDF"""
+    try:
+        from services.pdf_generator import PDFGenerator
+        
+        recipe = Recipe.objects(id=recipe_id).first()
+        if not recipe:
+            return jsonify({'error': 'Recipe not found'}), 404
+        
+        pdf_generator = PDFGenerator()
+        pdf_path = pdf_generator.generate_ingredients_pdf(recipe)
+        
+        return jsonify({
+            'pdf_url': pdf_path,
+            'message': 'Ingredients PDF generated successfully'
         }), 200
     
     except Exception as e:

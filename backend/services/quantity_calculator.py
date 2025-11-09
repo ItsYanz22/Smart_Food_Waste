@@ -58,14 +58,25 @@ class QuantityCalculator:
         Scale a single ingredient
         
         Args:
-            ingredient: Ingredient dictionary
+            ingredient: Ingredient dictionary or IngredientItem object
             scale_factor: Multiplier for scaling
         
         Returns:
             Scaled ingredient dictionary
         """
-        original_quantity = str(ingredient.get('quantity', '1'))
-        unit = ingredient.get('unit', '').lower()
+        # Handle both dictionary and IngredientItem object
+        if hasattr(ingredient, 'quantity'):
+            # It's an IngredientItem object
+            original_quantity = str(ingredient.quantity or '1')
+            unit = (ingredient.unit or '').lower()
+            name = ingredient.name or ''
+            category = ingredient.category or 'other'
+        else:
+            # It's a dictionary
+            original_quantity = str(ingredient.get('quantity', '1'))
+            unit = ingredient.get('unit', '').lower()
+            name = ingredient.get('name', '')
+            category = ingredient.get('category', 'other')
         
         # Parse quantity (handle fractions like "1/2", "1 1/2")
         quantity_value = self._parse_quantity(original_quantity)
@@ -77,10 +88,10 @@ class QuantityCalculator:
         scaled_quantity = self._format_quantity(scaled_value, unit)
         
         return {
-            'name': ingredient.get('name', ''),
+            'name': name,
             'quantity': scaled_quantity,
             'unit': unit,
-            'category': ingredient.get('category', 'other')
+            'category': category
         }
     
     def _parse_quantity(self, quantity_str):
