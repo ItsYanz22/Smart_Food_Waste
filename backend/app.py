@@ -25,9 +25,10 @@ app.config['GOOGLE_SEARCH_API_KEY'] = os.getenv('GOOGLE_SEARCH_API_KEY', '')
 app.config['GOOGLE_SEARCH_ENGINE_ID'] = os.getenv('GOOGLE_SEARCH_ENGINE_ID', '')
 
 # Initialize extensions
-# Configure CORS properly
+# Configure CORS properly - allow multiple origins
 CORS(app, 
-     origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+     origins=["http://localhost:8000", "http://127.0.0.1:8000", 
+              "http://localhost:5500", "http://127.0.0.1:5500"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
      allow_headers=["Content-Type", "Authorization"],
      supports_credentials=True)
@@ -77,7 +78,14 @@ except ImportError as e:
 def handle_preflight():
     if request.method == "OPTIONS":
         response = make_response()
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:8000")
+        # Allow the requesting origin
+        origin = request.headers.get('Origin')
+        allowed_origins = ["http://localhost:8000", "http://127.0.0.1:8000",
+                          "http://localhost:5500", "http://127.0.0.1:5500"]
+        if origin in allowed_origins:
+            response.headers.add("Access-Control-Allow-Origin", origin)
+        else:
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:8000")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
         response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
         response.headers.add("Access-Control-Allow-Credentials", "true")

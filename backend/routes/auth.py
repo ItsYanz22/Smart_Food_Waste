@@ -30,27 +30,43 @@ def register():
     if request.method == 'OPTIONS':
         from flask import make_response
         response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8000')
+        origin = request.headers.get('Origin', 'http://localhost:8000')
+        response.headers.add('Access-Control-Allow-Origin', origin)
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
     try:
+        # Get JSON data
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type must be application/json'}), 400
+        
         data = request.get_json()
         
         # Validate input
         if not data:
             return jsonify({'error': 'No data provided'}), 400
         
-        username = data.get('username', '').strip()
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
+        username = data.get('username', '').strip() if data.get('username') else ''
+        email = data.get('email', '').strip().lower() if data.get('email') else ''
+        password = data.get('password', '') if data.get('password') else ''
+        household_size = data.get('household_size', '1')
         
-        if not username or not email or not password:
-            return jsonify({'error': 'Username, email, and password are required'}), 400
+        # Validate required fields
+        if not username:
+            return jsonify({'error': 'Username is required'}), 400
         
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+        
+        if not password:
+            return jsonify({'error': 'Password is required'}), 400
+        
+        # Validate email format
         if not validate_email(email):
             return jsonify({'error': 'Invalid email format'}), 400
         
+        # Validate password
         if not validate_password(password):
             return jsonify({'error': 'Password must be at least 6 characters'}), 400
         
@@ -62,26 +78,43 @@ def register():
             return jsonify({'error': 'Email already exists'}), 400
         
         # Create new user
-        user = User(
-            username=username,
-            email=email,
-            household_size=data.get('household_size', '1'),
-            user_type=data.get('user_type', 'household')
-        )
-        user.set_password(password)
-        user.save()
-        
-        # Generate access token
-        access_token = create_access_token(identity=str(user.id))
-        
-        return jsonify({
-            'message': 'User registered successfully',
-            'access_token': access_token,
-            'user': user.to_dict()
-        }), 201
+        try:
+            user = User(
+                username=username,
+                email=email,
+                household_size=str(household_size) if household_size else '1',
+                user_type=data.get('user_type', 'household')
+            )
+            user.set_password(password)
+            user.save()
+            
+            # Generate access token
+            access_token = create_access_token(identity=str(user.id))
+            
+            # Add CORS headers to response
+            response = jsonify({
+                'message': 'User registered successfully',
+                'access_token': access_token,
+                'user': user.to_dict()
+            })
+            response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', 'http://localhost:8000'))
+            return response, 201
+        except Exception as db_error:
+            # Handle duplicate key errors
+            if 'duplicate' in str(db_error).lower() or 'E11000' in str(db_error):
+                if 'username' in str(db_error):
+                    return jsonify({'error': 'Username already exists'}), 400
+                elif 'email' in str(db_error):
+                    return jsonify({'error': 'Email already exists'}), 400
+            raise db_error
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_msg = str(e)
+        print(f"Registration error: {error_msg}")  # Debug logging
+        # Return user-friendly error message
+        if 'already exists' in error_msg.lower() or 'duplicate' in error_msg.lower():
+            return jsonify({'error': 'Username or email already exists'}), 400
+        return jsonify({'error': error_msg or 'Registration failed. Please try again.'}), 500
 
 
 @bp.route('/login', methods=['POST', 'OPTIONS'])
@@ -91,21 +124,30 @@ def login():
     if request.method == 'OPTIONS':
         from flask import make_response
         response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8000')
+        origin = request.headers.get('Origin', 'http://localhost:8000')
+        response.headers.add('Access-Control-Allow-Origin', origin)
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
     try:
+        # Get JSON data
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type must be application/json'}), 400
+        
         data = request.get_json()
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400
         
-        username = data.get('username', '').strip()
-        password = data.get('password', '')
+        username = data.get('username', '').strip() if data.get('username') else ''
+        password = data.get('password', '') if data.get('password') else ''
         
-        if not username or not password:
-            return jsonify({'error': 'Username and password are required'}), 400
+        if not username:
+            return jsonify({'error': 'Username is required'}), 400
+        
+        if not password:
+            return jsonify({'error': 'Password is required'}), 400
         
         # Find user by username or email
         user = User.objects(username=username).first()
@@ -121,14 +163,19 @@ def login():
         # Generate access token
         access_token = create_access_token(identity=str(user.id))
         
-        return jsonify({
+        # Add CORS headers to response
+        response = jsonify({
             'message': 'Login successful',
             'access_token': access_token,
             'user': user.to_dict()
-        }), 200
+        })
+        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', 'http://localhost:8000'))
+        return response, 200
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_msg = str(e)
+        print(f"Login error: {error_msg}")  # Debug logging
+        return jsonify({'error': error_msg or 'Login failed. Please check your credentials.'}), 500
 
 
 @bp.route('/me', methods=['GET'])

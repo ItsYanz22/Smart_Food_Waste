@@ -10,46 +10,52 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Try to import Config
 try:
     from config import Config
-    from services.ingredient_extractor import IngredientExtractor
 except ImportError:
     try:
         from backend.config import Config
-        from backend.services.ingredient_extractor import IngredientExtractor
     except ImportError:
         Config = None
-        IngredientExtractor = None
+
+# Try to import IngredientExtractor
+_ingredient_extractor_class = None
+try:
+    from services.ingredient_extractor import IngredientExtractor
+    _ingredient_extractor_class = IngredientExtractor
+except ImportError:
+    try:
+        from backend.services.ingredient_extractor import IngredientExtractor
+        _ingredient_extractor_class = IngredientExtractor
+    except ImportError:
+        _ingredient_extractor_class = None
 
 
 class RecipeService:
     """Service for fetching and parsing recipes"""
     
     def __init__(self):
+        # Get API keys
         if Config:
             self.api_key = Config.GOOGLE_SEARCH_API_KEY
             self.search_engine_id = Config.GOOGLE_SEARCH_ENGINE_ID
         else:
-            import os
             from dotenv import load_dotenv
             load_dotenv()
             self.api_key = os.getenv('GOOGLE_SEARCH_API_KEY', '')
             self.search_engine_id = os.getenv('GOOGLE_SEARCH_ENGINE_ID', '')
         
-        if IngredientExtractor:
-            self.ingredient_extractor = IngredientExtractor()
-        else:
-            # Try to import directly
+        # Initialize ingredient extractor
+        if _ingredient_extractor_class:
             try:
-                from services.ingredient_extractor import IngredientExtractor
-                self.ingredient_extractor = IngredientExtractor()
-            except ImportError:
-                try:
-                    from backend.services.ingredient_extractor import IngredientExtractor
-                    self.ingredient_extractor = IngredientExtractor()
-                except ImportError:
-                    print("Warning: IngredientExtractor not available - recipe parsing may be limited")
-                    self.ingredient_extractor = None
+                self.ingredient_extractor = _ingredient_extractor_class()
+            except Exception as e:
+                print(f"Warning: Could not initialize IngredientExtractor: {e}")
+                self.ingredient_extractor = None
+        else:
+            print("Warning: IngredientExtractor not available - recipe parsing may be limited")
+            self.ingredient_extractor = None
     
     def fetch_recipe(self, dish_name):
         """
@@ -122,7 +128,11 @@ class RecipeService:
             soup = BeautifulSoup(response.content, 'html.parser')
             
             # Extract ingredients using ingredient extractor
-            ingredients = self.ingredient_extractor.extract_from_html(soup)
+            if self.ingredient_extractor:
+                ingredients = self.ingredient_extractor.extract_from_html(soup)
+            else:
+                # Fallback: basic ingredient extraction
+                ingredients = self._basic_ingredient_extraction(soup)
             
             # Extract instructions
             instructions = self._extract_instructions(soup)
@@ -274,4 +284,51 @@ class RecipeService:
             print(f"Error fetching from Spoonacular: {str(e)}")
         
         return None
+    
+    def _basic_ingredient_extraction(self, soup):
+        """Basic ingredient extraction fallback when IngredientExtractor is not available"""
+        ingredients = []
+        
+        # Try to find ingredient lists
+        ingredient_selectors = [
+            {'itemprop': 'recipeIngredient'},
+            {'class': 'recipe-ingredient'},
+            {'class': 'ingredients'},
+            {'id': 'ingredients'}
+        ]
+        
+        for selector in ingredient_selectors:
+            elements = soup.find_all(attrs=selector)
+            if elements:
+                for elem in elements:
+                    text = elem.get_text().strip()
+                    if text and len(text) > 3:
+                        # Simple parsing - just extract text
+                        ingredients.append({
+                            'name': text,
+                            'quantity': '1',
+                            'unit': '',
+                            'category': 'other'
+                        })
+                if ingredients:
+                    break
+        
+        # If no structured list, try lists
+        if not ingredients:
+            lists = soup.find_all(['ul', 'ol'])
+            for ul in lists[:3]:  # Limit to first 3 lists
+                items = ul.find_all('li')
+                for item in items[:20]:  # Limit to 20 items
+                    text = item.get_text().strip()
+                    if text and len(text) > 3:
+                        ingredients.append({
+                            'name': text,
+                            'quantity': '1',
+                            'unit': '',
+                            'category': 'other'
+                        })
+                if ingredients:
+                    break
+        
+        return ingredients[:50]  # Limit to 50 ingredients
 

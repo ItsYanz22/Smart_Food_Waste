@@ -28,15 +28,56 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
     
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
-        const result = await response.json();
         
+        // Clone response for error handling
+        const responseClone = response.clone();
+        
+        // Try to parse as JSON first
+        let result;
+        const contentType = response.headers.get('content-type') || '';
+        
+        if (contentType.includes('application/json')) {
+            try {
+                result = await response.json();
+            } catch (jsonError) {
+                // If JSON parsing fails, try text
+                const text = await responseClone.text();
+                throw new Error(text || `Server returned ${response.status} with invalid JSON`);
+            }
+        } else {
+            // Non-JSON response
+            const text = await response.text();
+            if (!response.ok) {
+                throw new Error(text || `Server returned ${response.status}`);
+            }
+            // Success with non-JSON - return text
+            return { message: text };
+        }
+        
+        // Check if response is OK
         if (!response.ok) {
-            throw new Error(result.error || 'Request failed');
+            const errorMsg = result.error || result.message || `Request failed with status ${response.status}`;
+            console.error('API Error:', {
+                status: response.status,
+                endpoint: endpoint,
+                error: errorMsg,
+                data: result
+            });
+            throw new Error(errorMsg);
         }
         
         return result;
     } catch (error) {
-        throw error;
+        // Network errors or fetch failures
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            throw new Error('Failed to connect to server. Make sure the backend is running on http://localhost:5000');
+        }
+        // If it's already an Error with a message, pass it through
+        if (error instanceof Error) {
+            throw error;
+        }
+        // Otherwise, wrap it
+        throw new Error(`Network error: ${error.message || 'Unknown error occurred'}`);
     }
 }
 
@@ -46,10 +87,10 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 const authAPI = {
     register: async (username, email, password, householdSize) => {
         return apiRequest('/auth/register', 'POST', {
-            username,
-            email,
-            password,
-            household_size: householdSize
+            username: username.trim(),
+            email: email.trim().toLowerCase(),
+            password: password,
+            household_size: householdSize ? String(householdSize).trim() : '1'
         });
     },
     

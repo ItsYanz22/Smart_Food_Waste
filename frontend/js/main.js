@@ -77,11 +77,24 @@ function setupFormHandlers() {
 async function handleLogin(e) {
     e.preventDefault();
     
-    const username = document.getElementById('login-username').value;
+    // Prevent multiple submissions
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn && submitBtn.disabled) {
+        return; // Already submitting
+    }
+    
+    const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
+    
+    if (!username || !password) {
+        showError('Please enter username and password');
+        return;
+    }
     
     try {
         showLoading();
+        if (submitBtn) submitBtn.disabled = true;
+        
         const result = await authAPI.login(username, password);
         
         setToken(result.access_token);
@@ -90,9 +103,11 @@ async function handleLogin(e) {
         showApp();
         showSuccess('Login successful!');
     } catch (error) {
-        showError(error.message || 'Login failed');
+        console.error('Login error:', error);
+        showError(error.message || 'Login failed. Please check your credentials.');
     } finally {
         hideLoading();
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -102,13 +117,32 @@ async function handleLogin(e) {
 async function handleRegister(e) {
     e.preventDefault();
     
-    const username = document.getElementById('register-username').value;
-    const email = document.getElementById('register-email').value;
+    // Prevent multiple submissions
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn && submitBtn.disabled) {
+        return; // Already submitting
+    }
+    
+    const username = document.getElementById('register-username').value.trim();
+    const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
-    const householdSize = document.getElementById('register-household').value;
+    const householdSize = document.getElementById('register-household').value || '1';
+    
+    // Basic client-side validation
+    if (!username || !email || !password) {
+        showError('Please fill in all required fields');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showError('Password must be at least 6 characters');
+        return;
+    }
     
     try {
         showLoading();
+        if (submitBtn) submitBtn.disabled = true;
+        
         const result = await authAPI.register(username, email, password, householdSize);
         
         setToken(result.access_token);
@@ -117,9 +151,11 @@ async function handleRegister(e) {
         showApp();
         showSuccess('Registration successful!');
     } catch (error) {
-        showError(error.message || 'Registration failed');
+        console.error('Registration error:', error);
+        showError(error.message || 'Registration failed. Please try again.');
     } finally {
         hideLoading();
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
