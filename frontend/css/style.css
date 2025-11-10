@@ -466,3 +466,137 @@ body {
     background-color: #138496;
 }
 
+/* -------------------------
+   Premium UI additions
+   ------------------------- */
+
+/* Use a nicer system stack, increase letter spacing for premium look */
+:root{
+  --accent: #667eea;
+  --accent-2: #764ba2;
+  --glass-bg: rgba(255,255,255,0.06);
+  --glass-strong: rgba(255,255,255,0.12);
+  --card-radius: 14px;
+  --soft-shadow: 0 8px 30px rgba(16,24,40,0.12);
+  --transition-fast: 220ms cubic-bezier(.2,.9,.3,1);
+  --transition-medium: 420ms cubic-bezier(.2,.9,.3,1);
+}
+
+body {
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial;
+  color: #0f172a;
+  background: linear-gradient(180deg, rgba(10,14,29,0.9) 0%, rgba(62,41,82,0.75) 100%);
+  --safe-pad: 28px;
+  padding: var(--safe-pad);
+}
+
+/* Glass panels */
+.glass {
+  background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--soft-shadow);
+  border-radius: var(--card-radius);
+}
+
+/* Header tweaks */
+.header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:18px 24px;
+  position:relative;
+  overflow:visible;
+}
+.header .header-inner { flex: 1; }
+.header h1 { font-size:1.6rem; letter-spacing:0.6px; color:white; margin-bottom:4px; }
+.header .subtitle { color: rgba(255,255,255,0.9); font-size:0.95rem; }
+
+/* Header actions */
+.header-actions { display:flex; gap:10px; align-items:center; }
+.btn-info { background: linear-gradient(90deg,var(--accent),var(--accent-2)); box-shadow: 0 6px 18px rgba(102,126,234,0.18); }
+
+/* Container modifications */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  border-radius: 18px;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Nav micro-interaction */
+.nav { transition: transform var(--transition-fast), background var(--transition-fast); }
+.nav-btn {
+  background: transparent;
+  color: rgba(255,255,255,0.9);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transform-origin:center;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+  font-weight:600;
+}
+.nav-btn.active { transform: translateY(-4px) scale(1.03); box-shadow: 0 10px 30px rgba(0,0,0,0.18); background: linear-gradient(90deg,var(--accent),var(--accent-2)); color:white; }
+
+/* Section cards and reveal */
+.section { padding: 28px; transition: opacity var(--transition-medium), transform var(--transition-medium); opacity:0; transform: translateY(20px) scale(0.997); }
+.section.active { opacity:1; transform: translateY(0) scale(1); }
+
+/* Recipe result card */
+.recipe-results {
+  padding: 22px;
+  background: linear-gradient(180deg,#ffffff 0%, #fafcff 100%);
+  border-radius: 12px;
+  box-shadow: 0 6px 22px rgba(15,23,42,0.06);
+  border: 1px solid rgba(12,18,35,0.04);
+}
+
+/* Buttons */
+.btn { --btn-shadow: 0 8px 20px rgba(16,24,40,0.08); transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
+.btn:hover { transform: translateY(-4px); box-shadow: var(--btn-shadow); }
+
+/* Fancy spinner tweak */
+.spinner { width: 60px; height: 60px; border-width:5px; border-top-color: var(--accent); }
+
+/* Launch overlay */
+.launch-overlay {
+  position:fixed; inset:0; z-index:9999;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(180deg, rgba(10,12,25,0.9), rgba(15,18,35,0.95));
+  opacity:1; transition: opacity 700ms ease, transform 600ms ease;
+}
+.launch-overlay.hide { opacity:0; pointer-events:none; transform: scale(0.995); }
+.launch-inner { text-align:center; color: white; transform: translateY(0); animation: floaty 4s ease-in-out infinite; }
+@keyframes floaty { 0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)} }
+.launch-title { font-size:1.8rem; margin-top:14px; letter-spacing:0.8px; }
+.launch-sub { opacity:0.9; margin-top:6px; }
+
+/* Plate animation inside launch overlay */
+.launch-svg { width:260px; height:100px; display:block; margin:0 auto; }
+.launch-svg .splash { transform-origin:center; animation: splash 1.6s cubic-bezier(.2,.9,.3,1) infinite; }
+.launch-svg .spoon { transform-origin: left center; animation: spoon 2.4s ease-in-out infinite; }
+@keyframes splash { 0%{transform:translateY(0) scale(0.98)}50%{transform:translateY(-4px) scale(1.02)}100%{transform:translateY(0) scale(0.98)} }
+@keyframes spoon { 0%{transform:rotate(12deg)}50%{transform:rotate(18deg)}100%{transform:rotate(12deg)} }
+
+/* Animated background layering */
+#animated-bg { position: fixed; inset:0; z-index: -1; overflow:hidden; pointer-events:none; }
+.bg-svg { width:100%; height:100%; opacity:0.35; transform: translateY(-6%); transition: transform 800ms ease; }
+#particle-canvas { position: absolute; inset:0; width:100%; height:100%; }
+
+/* Reveal helper classes for scroll reveal */
+.reveal { opacity:0; transform: translateY(20px) scale(0.998); transition: opacity 600ms var(--transition-medium), transform 600ms var(--transition-medium); }
+.reveal.in-view { opacity:1; transform: translateY(0) scale(1); }
+
+/* Ingredient highlight micro animation */
+.ingredient-item { transition: transform 320ms var(--transition-fast), box-shadow var(--transition-fast); }
+.ingredient-item:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 10px 24px rgba(12,18,45,0.08); }
+
+/* Mobile tweaks for new components */
+@media (max-width: 768px) {
+  .header { flex-direction: column; align-items:flex-start; gap:10px; padding:18px; }
+  .launch-svg { width:200px; height:80px; }
+  .launch-title { font-size:1.3rem; }
+  .container { padding:0; }
+}

@@ -329,3 +329,26 @@ function searchDishFromFavorite(dishName) {
     document.getElementById('dish-search-form').dispatchEvent(new Event('submit'));
 }
 
+// CHANGES
+// apply reveal class to elements that we want to animate in
+document.addEventListener('DOMContentLoaded', () => {
+  // mark elements
+  document.querySelectorAll('.grocery-list-card, .recipe-results, .welcome-message, .ingredient-item, .favorite-dish-tag').forEach(el => {
+    el.classList.add('reveal');
+  });
+
+  // ensure recipe-info items get reveal behavior
+  const recipeInfo = document.getElementById('recipe-info');
+  if (recipeInfo) {
+    recipeInfo.classList.add('reveal');
+  }
+
+  // PDF upload wiring handled in pdfUpload.js, but let's ensure the button exists
+  const pdfBtn = document.getElementById('pdf-upload-btn');
+  if (pdfBtn) {
+    pdfBtn.addEventListener('mouseover', ()=> pdfBtn.classList.add('hovering'));
+    pdfBtn.addEventListener('mouseout', ()=> pdfBtn.classList.remove('hovering'));
+  }
+});
+
+

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI-Based Smart Food Waste Management</title>
@@ -8,11 +9,55 @@
     <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
+    <body>
+    <!-- Premium animated launch overlay -->
+    <div id="launch-overlay" class="launch-overlay">
+      <div class="launch-inner">
+        <!-- Inline SVG 'plate & spoon' animation -->
+        <svg class="launch-svg" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ffd89b"/><stop offset="1" stop-color="#19547b"/></linearGradient></defs>
+          <ellipse cx="150" cy="74" rx="120" ry="28" fill="url(#g)" opacity="0.95"/>
+          <g class="plate" transform="translate(10,6)">
+            <circle cx="150" cy="40" r="36" fill="#fff" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
+            <path class="splash" d="M130 40 q8 -20 40 -8 q-8 14 -40 18" fill="#ffd89b" opacity="0.9"/>
+            <rect class="spoon" x="190" y="20" width="40" height="6" rx="3" transform="rotate(20 210 23)" fill="#d0d0d0"/>
+          </g>
+        </svg>
+        <h1 class="launch-title">Welcome to Smart Food</h1>
+        <p class="launch-sub">Premium food planning for less waste — building smarter kitchens.</p>
+      </div>
+    </div>
+
+    <!-- Animated background -->
+    <div id="animated-bg" class="animated-bg" aria-hidden="true">
+      <!-- we use several layered svgs/gradients for a premium feel -->
+      <svg class="bg-svg" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1440 600">
+        <defs>
+          <linearGradient id="bgGrad" x1="0" x2="1">
+            <stop offset="0" stop-color="#0f172a"/>
+            <stop offset="1" stop-color="#40275e"/>
+          </linearGradient>
+        </defs>
+        <rect width="1440" height="600" fill="url(#bgGrad)"></rect>
+        <!-- subtle food icons repeated as paths (decorative, very low opacity) -->
+        <g opacity="0.06" transform="translate(80,40) scale(1.2)">
+          <path d="M80 60 q20 -40 60 -40 q40 0 60 40 q-20 28 -60 28 q-40 0 -60 -28z" fill="#fff"/>
+        </g>
+      </svg>
+      <canvas id="particle-canvas"></canvas>
+    </div>
+
     <div class="container">
         <!-- Header -->
-        <header class="header">
-            <h1>AI-Based Smart Food Waste Management</h1>
-            <p class="subtitle">Reduce waste through precise ingredient planning</p>
+        <header class="header glass">
+            <div class="header-inner">
+              <h1>AI-Based Smart Food Waste Management</h1>
+              <p class="subtitle">Reduce waste through precise ingredient planning</p>
+            </div>
+            <div class="header-actions">
+              <input id="pdf-upload-input" type="file" accept="application/pdf" style="display:none" />
+              <button id="pdf-upload-btn" class="btn btn-info">Upload Recipe PDF</button>
+            </div>
         </header>
 
         <!-- Login/Register Section (hidden after login) -->
@@ -21,7 +66,7 @@
                 <button class="tab-btn active" onclick="showLogin()">Login</button>
                 <button class="tab-btn" onclick="showRegister()">Register</button>
             </div>
-            
+
             <div id="login-form" class="auth-form active">
                 <h2>Login</h2>
                 <form id="loginForm">
@@ -36,7 +81,7 @@
                     <button type="submit" class="btn btn-primary">Login</button>
                 </form>
             </div>
-            
+
             <div id="register-form" class="auth-form">
                 <h2>Register</h2>
                 <form id="registerForm">
@@ -64,12 +109,12 @@
         <!-- Main App Section (hidden before login) -->
         <div id="app-section" class="app-section" style="display: none;">
             <!-- Welcome Message -->
-            <div id="welcome-message" class="welcome-message">
+            <div id="welcome-message" class="welcome-message glass">
                 <h2 id="welcome-text">Welcome Back!</h2>
             </div>
-            
+
             <!-- Navigation -->
-            <nav class="nav">
+            <nav class="nav glass">
                 <button class="nav-btn active" onclick="showSection('search')">Search Dish</button>
                 <button class="nav-btn" onclick="showSection('lists')">My Lists</button>
                 <button class="nav-btn" onclick="showSection('profile')">Profile</button>
@@ -79,13 +124,13 @@
             <!-- Search Dish Section -->
             <div id="search-section" class="section active">
                 <h2>Search for a Dish</h2>
-                
+
                 <!-- Tabs for Search Method -->
                 <div class="search-tabs">
                     <button class="tab-btn active" onclick="switchSearchMethod('name')">Search by Name</button>
                     <button class="tab-btn" onclick="switchSearchMethod('url')">Enter Recipe URL</button>
                 </div>
-                
+
                 <!-- Search by Name Form -->
                 <form id="dish-search-form" class="search-form active">
                     <div class="form-group">
@@ -95,7 +140,7 @@
                     </div>
                     <button type="submit" class="btn btn-primary">Search Recipe</button>
                 </form>
-                
+
                 <!-- Search by URL Form -->
                 <form id="recipe-url-form" class="search-form" style="display: none;">
                     <div class="form-group">
@@ -110,13 +155,13 @@
                 <div id="recipe-results" class="recipe-results" style="display: none;">
                     <h3>Recipe Found</h3>
                     <div id="recipe-info"></div>
-                    
+
                     <div class="form-group">
                         <label for="household-size">Household Size (Number of People)</label>
                         <input type="number" id="household-size" min="1" value="1" required>
                         <small>This will scale the ingredients to match your household size</small>
                     </div>
-                    
+
                     <div class="recipe-actions">
                         <button onclick="generateGroceryList()" class="btn btn-success">Generate Grocery List</button>
                         <button onclick="addToFavorites()" class="btn btn-secondary">Add to Favorites</button>
@@ -157,7 +202,7 @@
                     </div>
                     <button type="submit" class="btn btn-primary">Update Profile</button>
                 </form>
-                
+
                 <div class="favorites-section">
                     <h3>Favorite Dishes</h3>
                     <div id="favorite-dishes" class="favorite-dishes"></div>
@@ -166,9 +211,15 @@
         </div>
     </div>
 
+    <!-- PDF.js (fallback client-side parser) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.7.107/pdf.min.js" integrity="" crossorigin="anonymous"></script>
+
+    <!-- Existing app JS -->
     <script src="js/utils.js"></script>
     <script src="js/api.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/pdfUpload.js"></script>
+    <script src="js/animations.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

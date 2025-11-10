@@ -67,17 +67,19 @@ function showError(message) {
 function showSuccess(message) {
     const errorDiv = document.getElementById('error-message');
     if (errorDiv) {
-        errorDiv.className = 'success-message';
+        errorDiv.classList.remove('error-message');
+        errorDiv.classList.add('success-message');
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
-        
-        // Hide after 5 seconds
+
         setTimeout(() => {
             errorDiv.style.display = 'none';
-            errorDiv.className = 'error-message';
+            errorDiv.classList.remove('success-message');
+            errorDiv.classList.add('error-message');
         }, 5000);
     }
 }
+
 
 /**
  * Show loading indicator

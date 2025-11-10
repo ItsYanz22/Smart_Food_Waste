@@ -10,6 +10,20 @@ document.addEventListener('DOMContentLoaded', () => {
     setupFormHandlers();
 });
 
+// CHANGES 
+// Smooth show/hide of sections (replace direct style changes if present)
+function showSectionAnimated(sectionName) {
+  const sections = document.querySelectorAll('.section');
+  sections.forEach(s => {
+    if (s.id === `${sectionName}-section`) {
+      s.classList.add('active');
+      s.classList.add('reveal');
+    } else {
+      s.classList.remove('active');
+    }
+  });
+}
+
 /**
  * Check if user is authenticated
  */

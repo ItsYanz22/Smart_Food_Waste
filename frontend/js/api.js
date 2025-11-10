@@ -198,3 +198,37 @@ const userAPI = {
     }
 };
 
+/**
+ * CHANGES IN CODE
+ */
+
+// ------------------- PDF / Text extraction APIs -------------------
+dishAPI.extractFromPdf = async (file) => {
+  // file is a File object
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const token = getToken();
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    const resp = await fetch(`${API_BASE_URL}/dish/extract-pdf`, {
+      method: 'POST',
+      headers,
+      body: form
+    });
+    if (!resp.ok) {
+      const t = await resp.text();
+      throw new Error(t || `Server returned ${resp.status}`);
+    }
+    const json = await resp.json();
+    return json;
+  } catch (err) {
+    throw err;
+  }
+};
+
+// optional: if you want to send pre-extracted text to backend
+dishAPI.extractFromText = async (text) => {
+  return apiRequest('/dish/extract-text', 'POST', { text });
+};
