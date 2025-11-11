@@ -56,6 +56,27 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
         
         // Check if response is OK
         if (!response.ok) {
+            // Handle authentication errors gracefully
+            if (response.status === 401 || response.status === 403) {
+                // Only logout if it's actually a token expiration issue
+                const errorMsg = result.error || result.message || 'Authentication failed';
+                if (errorMsg.includes('token') || errorMsg.includes('expired') || errorMsg.includes('invalid')) {
+                    // Token expired or invalid - logout user
+                    if (typeof removeToken === 'function') {
+                        removeToken();
+                    }
+                    if (typeof removeCurrentUser === 'function') {
+                        removeCurrentUser();
+                    }
+                    if (typeof showAuth === 'function') {
+                        showAuth();
+                    }
+                    throw new Error('Your session has expired. Please log in again.');
+                }
+                // Other auth errors - don't logout, just show error
+                throw new Error(errorMsg);
+            }
+            
             const errorMsg = result.error || result.message || `Request failed with status ${response.status}`;
             console.error('API Error:', {
                 status: response.status,

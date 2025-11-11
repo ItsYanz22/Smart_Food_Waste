@@ -88,7 +88,7 @@ class RecipeService:
     
     def fetch_recipe(self, dish_name):
         """
-        Fetch recipe from Google Search API
+        Fetch recipe from Spoonacular API (primary) or Google Search (fallback)
         
         Args:
             dish_name: Name of the dish to search for
@@ -96,6 +96,12 @@ class RecipeService:
         Returns:
             Dictionary containing recipe data or None if not found
         """
+        # Try Spoonacular API first (more reliable, structured data)
+        recipe_data = self._fetch_from_spoonacular(dish_name)
+        if recipe_data:
+            return recipe_data
+        
+        # Fallback to Google Search + web scraping only if Spoonacular fails
         try:
             # Search for recipe
             search_query = f"{dish_name} recipe"
@@ -111,13 +117,12 @@ class RecipeService:
             response = requests.get(url, params=params, timeout=10)
             
             if response.status_code != 200:
-                # Fallback to Spoonacular if available
-                return self._fetch_from_spoonacular(dish_name)
+                return None
             
             search_results = response.json()
             
             if 'items' not in search_results or len(search_results['items']) == 0:
-                return self._fetch_from_spoonacular(dish_name)
+                return None
             
             # Try to parse first result
             for item in search_results['items']:
@@ -127,12 +132,11 @@ class RecipeService:
                     recipe_data['source_type'] = 'google_search'
                     return recipe_data
             
-            # If no recipe found, return None
             return None
         
         except Exception as e:
             print(f"Error fetching recipe: {str(e)}")
-            return self._fetch_from_spoonacular(dish_name)
+            return None
     
     def _parse_recipe_page(self, url, dish_name):
         """
@@ -282,7 +286,7 @@ class RecipeService:
         return 4
     
     def _fetch_from_spoonacular(self, dish_name):
-        """Fallback to Spoonacular API if available"""
+        """Fetch recipe from Spoonacular API (primary method)"""
         spoonacular_key = ''
         if Config:
             spoonacular_key = Config.SPOONACULAR_API_KEY
@@ -293,61 +297,137 @@ class RecipeService:
             spoonacular_key = os.getenv('SPOONACULAR_API_KEY', '')
         
         if not spoonacular_key:
+            print("Warning: SPOONACULAR_API_KEY not set. Please add it to your .env file.")
             return None
         
         try:
+            # Search for recipes
             url = "https://api.spoonacular.com/recipes/complexSearch"
             params = {
                 'apiKey': spoonacular_key,
                 'query': dish_name,
-                'number': 1
+                'number': 1,
+                'addRecipeInformation': 'true'  # Get basic info in search
             }
             
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=15)
             
             if response.status_code == 200:
                 data = response.json()
                 if 'results' in data and len(data['results']) > 0:
                     recipe_id = data['results'][0]['id']
-                    # Get detailed recipe
+                    
+                    # Get detailed recipe information
                     detail_url = f"https://api.spoonacular.com/recipes/{recipe_id}/information"
-                    detail_response = requests.get(
-                        detail_url,
-                        params={'apiKey': spoonacular_key},
-                        timeout=10
-                    )
+                    detail_params = {
+                        'apiKey': spoonacular_key,
+                        'includeNutrition': 'false'
+                    }
+                    detail_response = requests.get(detail_url, params=detail_params, timeout=15)
                     
                     if detail_response.status_code == 200:
                         recipe_detail = detail_response.json()
-                        ingredients = [
-                            {
-                                'name': ing.get('name', ''),
-                                'quantity': str(ing.get('amount', '')),
-                                'unit': ing.get('unit', ''),
-                                'category': None
-                            }
-                            for ing in recipe_detail.get('extendedIngredients', [])
-                        ]
                         
+                        # Extract ingredients (structured data from API)
+                        ingredients = []
+                        for ing in recipe_detail.get('extendedIngredients', []):
+                            ingredients.append({
+                                'name': ing.get('name', '').strip(),
+                                'quantity': str(ing.get('amount', '1')),
+                                'unit': ing.get('unit', '').strip(),
+                                'category': self._categorize_ingredient(ing.get('name', ''))
+                            })
+                        
+                        # Extract instructions (structured steps)
                         instructions = []
-                        if 'analyzedInstructions' in recipe_detail:
-                            for instruction in recipe_detail['analyzedInstructions']:
-                                for step in instruction.get('steps', []):
-                                    instructions.append(step.get('step', ''))
+                        if 'analyzedInstructions' in recipe_detail and recipe_detail['analyzedInstructions']:
+                            for instruction_group in recipe_detail['analyzedInstructions']:
+                                for step in instruction_group.get('steps', []):
+                                    step_text = step.get('step', '').strip()
+                                    if step_text:
+                                        instructions.append(step_text)
+                        
+                        # If no analyzed instructions, try summary
+                        if not instructions and recipe_detail.get('instructions'):
+                            # Parse HTML instructions if available
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(recipe_detail.get('instructions', ''), 'html.parser')
+                            for p in soup.find_all(['p', 'li']):
+                                text = p.get_text().strip()
+                                if text and len(text) > 10:
+                                    instructions.append(text)
+                        
+                        # Get title
+                        title = recipe_detail.get('title', dish_name)
+                        
+                        # Generate summary
+                        summary = recipe_detail.get('summary', '')
+                        if summary:
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(summary, 'html.parser')
+                            summary = soup.get_text().strip()[:300]  # Limit to 300 chars
                         
                         return {
-                            'dish_name': dish_name,
+                            'dish_name': title or dish_name,
                             'ingredients': ingredients,
                             'instructions': instructions,
                             'servings': recipe_detail.get('servings', 4),
+                            'prep_time': recipe_detail.get('preparationMinutes'),
+                            'cook_time': recipe_detail.get('cookingMinutes'),
+                            'total_time': recipe_detail.get('readyInMinutes'),
+                            'summary': summary,
+                            'title': title,
                             'source_type': 'spoonacular',
-                            'source_url': recipe_detail.get('sourceUrl', '')
+                            'source_url': recipe_detail.get('sourceUrl', recipe_detail.get('spoonacularSourceUrl', ''))
                         }
+            elif response.status_code == 402:
+                print("Warning: Spoonacular API quota exceeded. Please check your API key or upgrade plan.")
+            else:
+                print(f"Warning: Spoonacular API returned status {response.status_code}")
         
+        except requests.exceptions.Timeout:
+            print("Error: Spoonacular API request timed out")
         except Exception as e:
             print(f"Error fetching from Spoonacular: {str(e)}")
         
         return None
+    
+    def _categorize_ingredient(self, ingredient_name):
+        """Categorize ingredient based on name"""
+        if not ingredient_name:
+            return 'other'
+        
+        name_lower = ingredient_name.lower()
+        
+        # Produce
+        if any(kw in name_lower for kw in ['tomato', 'onion', 'garlic', 'potato', 'carrot', 'lettuce', 'pepper', 'cucumber', 'spinach', 'broccoli', 'cauliflower', 'celery', 'mushroom']):
+            return 'produce'
+        
+        # Dairy
+        if any(kw in name_lower for kw in ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'sour cream', 'yoghurt']):
+            return 'dairy'
+        
+        # Meat
+        if any(kw in name_lower for kw in ['beef', 'pork', 'lamb', 'steak', 'ground beef', 'ground pork']):
+            return 'meat'
+        
+        # Poultry
+        if any(kw in name_lower for kw in ['chicken', 'turkey', 'duck']):
+            return 'poultry'
+        
+        # Seafood
+        if any(kw in name_lower for kw in ['fish', 'salmon', 'shrimp', 'crab', 'lobster', 'tuna', 'cod']):
+            return 'seafood'
+        
+        # Grains
+        if any(kw in name_lower for kw in ['rice', 'pasta', 'flour', 'bread', 'wheat', 'noodle', 'quinoa']):
+            return 'grains'
+        
+        # Spices
+        if any(kw in name_lower for kw in ['salt', 'pepper', 'cumin', 'turmeric', 'coriander', 'spice', 'paprika', 'cinnamon']):
+            return 'spices'
+        
+        return 'other'
     
     def _basic_ingredient_extraction(self, soup):
         """Basic ingredient extraction fallback when IngredientExtractor is not available"""

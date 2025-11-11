@@ -319,8 +319,14 @@ window.downloadRecipePDF = async function() {
         showLoading();
         const result = await dishAPI.downloadRecipePDF(currentRecipeId);
         if (result.pdf_url) {
-            window.open(result.pdf_url, '_blank');
+            // Construct full URL if relative path
+            const pdfUrl = result.pdf_url.startsWith('http') 
+                ? result.pdf_url 
+                : `http://localhost:5000${result.pdf_url}`;
+            window.open(pdfUrl, '_blank');
             showSuccess('Recipe steps PDF downloaded!');
+        } else {
+            showError('PDF URL not received from server');
         }
     } catch (error) {
         showError(error.message || 'Failed to download recipe PDF');
@@ -343,8 +349,14 @@ window.downloadIngredientsPDF = async function() {
         showLoading();
         const result = await dishAPI.downloadIngredientsPDF(currentRecipeId);
         if (result.pdf_url) {
-            window.open(result.pdf_url, '_blank');
+            // Construct full URL if relative path
+            const pdfUrl = result.pdf_url.startsWith('http') 
+                ? result.pdf_url 
+                : `http://localhost:5000${result.pdf_url}`;
+            window.open(pdfUrl, '_blank');
             showSuccess('Ingredients PDF downloaded!');
+        } else {
+            showError('PDF URL not received from server');
         }
     } catch (error) {
         showError(error.message || 'Failed to download ingredients PDF');
