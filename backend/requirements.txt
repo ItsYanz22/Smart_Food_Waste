@@ -9,4 +9,4 @@ requests==2.31.0
 beautifulsoup4==4.12.2
 reportlab==4.0.7
 Werkzeug==3.0.1
-
+schedule==1.2.0

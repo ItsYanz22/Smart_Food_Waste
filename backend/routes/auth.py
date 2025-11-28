@@ -23,19 +23,9 @@ bp = Blueprint('auth', __name__)
 # MongoDB connection is handled in app.py - no need to connect here
 
 
-@bp.route('/register', methods=['POST', 'OPTIONS'])
+@bp.route('/register', methods=['POST'])
 def register():
     """User registration endpoint"""
-    # Handle CORS preflight
-    if request.method == 'OPTIONS':
-        from flask import make_response
-        response = make_response()
-        origin = request.headers.get('Origin', 'http://localhost:8000')
-        response.headers.add('Access-Control-Allow-Origin', origin)
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
     try:
         # Debug: Log request details
         print(f"\n=== REGISTRATION REQUEST ===")
@@ -124,7 +114,6 @@ def register():
                 'access_token': access_token,
                 'user': user.to_dict()
             })
-            response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', 'http://localhost:8000'))
             return response, 201
         except Exception as db_error:
             # Handle duplicate key errors
@@ -144,19 +133,9 @@ def register():
         return jsonify({'error': error_msg or 'Registration failed. Please try again.'}), 500
 
 
-@bp.route('/login', methods=['POST', 'OPTIONS'])
+@bp.route('/login', methods=['POST'])
 def login():
     """User login endpoint"""
-    # Handle CORS preflight
-    if request.method == 'OPTIONS':
-        from flask import make_response
-        response = make_response()
-        origin = request.headers.get('Origin', 'http://localhost:8000')
-        response.headers.add('Access-Control-Allow-Origin', origin)
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
     try:
         # Get JSON data
         if not request.is_json:
@@ -190,14 +169,12 @@ def login():
         # Generate access token
         access_token = create_access_token(identity=str(user.id))
         
-        # Add CORS headers to response
-        response = jsonify({
+        # Return response (CORS handled globally by flask-cors)
+        return jsonify({
             'message': 'Login successful',
             'access_token': access_token,
             'user': user.to_dict()
-        })
-        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', 'http://localhost:8000'))
-        return response, 200
+        }), 200
     
     except Exception as e:
         error_msg = str(e)

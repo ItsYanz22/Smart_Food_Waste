@@ -3,10 +3,12 @@ NLP processing utilities for dish name and ingredient processing
 """
 import re
 import string
+import os
+import json
 
 
 class NLPProcessor:
-    """Natural Language Processing utilities"""
+    """Natural Language Processing utilities with OpenAI integration"""
     
     def __init__(self):
         # Common dish name variations and synonyms
@@ -16,6 +18,31 @@ class NLPProcessor:
             'rice': ['chawal', 'bhaat'],
             'bread': ['roti', 'naan', 'chapati']
         }
+        
+        # Initialize OpenAI client if API key is available
+        self.openai_client = None
+        self.use_openai = False
+        self._try_init_openai()
+    
+    def _try_init_openai(self):
+        """Lazy initialization of OpenAI client"""
+        if self.use_openai:
+            return  # Already initialized
+        
+        try:
+            openai_api_key = os.getenv('OPENAI_API_KEY')
+            if openai_api_key and openai_api_key.startswith('sk-'):
+                try:
+                    from openai import OpenAI
+                    self.openai_client = OpenAI(api_key=openai_api_key)
+                    self.use_openai = True
+                    print("[INFO] OpenAI integration enabled for NLP processing")
+                except ImportError:
+                    print("[WARN] OpenAI library not installed. Using fallback NLP processing.")
+                except Exception as e:
+                    print(f"[WARN] Could not initialize OpenAI: {e}")
+        except Exception as e:
+            pass
     
     def normalize_text(self, text):
         """
@@ -294,6 +321,15 @@ class NLPProcessor:
         
         line = line.strip()
         
+        # Try OpenAI-based parsing first if available
+        if self.use_openai and self.openai_client:
+            try:
+                parsed = self._parse_ingredient_with_openai(line)
+                if parsed:
+                    return parsed
+            except Exception as e:
+                print(f"[WARN] OpenAI parsing failed, falling back to regex: {e}")
+        
         # Pattern: quantity unit ingredient or just ingredient
         # Examples: "2 cups flour", "1 tsp salt", "onions"
         ingredient_match = re.match(r'^(\d+[\s/]*\d*)?\s*([a-z]+)?\s*(.+)$', line, re.IGNORECASE)
@@ -324,4 +360,121 @@ class NLPProcessor:
             }
         
         return None
+    
+    def _parse_ingredient_with_openai(self, ingredient_line):
+        """
+        Use OpenAI to parse and normalize ingredient line
+        
+        Args:
+            ingredient_line: Raw ingredient text (e.g., "2 cups all-purpose flour")
+        
+        Returns:
+            Dict with parsed ingredient or None
+        """
+        # Try lazy initialization if not already initialized
+        if not self.use_openai:
+            self._try_init_openai()
+        
+        if not self.use_openai or not self.openai_client:
+            return None
+        
+        try:
+            response = self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a recipe parser. Extract ingredient information from text. Return JSON with fields: name, quantity, unit, category (e.g., 'dairy', 'spices', 'produce', 'grains', 'other'). Be concise."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Parse this ingredient: {ingredient_line}"
+                    }
+                ],
+                temperature=0.3,
+                max_tokens=100
+            )
+            
+            # Extract JSON from response
+            response_text = response.choices[0].message.content.strip()
+            
+            # Try to parse as JSON
+            if response_text.startswith('{'):
+                parsed = json.loads(response_text)
+                if 'name' in parsed and parsed['name']:
+                    return {
+                        'name': parsed.get('name', ''),
+                        'quantity': str(parsed.get('quantity', '1')),
+                        'unit': parsed.get('unit', ''),
+                        'category': parsed.get('category', None)
+                    }
+        except Exception as e:
+            # Silently fall back to regex parsing
+            pass
+        
+        return None
+    
+    def normalize_recipe_with_ai(self, raw_recipe_dict):
+        """
+        Use OpenAI to enhance and normalize a recipe dictionary
+        
+        Args:
+            raw_recipe_dict: Dictionary with title, ingredients, instructions, summary
+        
+        Returns:
+            Enhanced recipe dictionary
+        """
+        # Try lazy initialization if not already initialized
+        if not self.use_openai:
+            self._try_init_openai()
+        
+        if not self.use_openai or not self.openai_client:
+            return raw_recipe_dict
+        
+        try:
+            # Create prompt for recipe enhancement
+            prompt = f"""
+            Analyze this recipe and provide:
+            1. Indian cooking tips and techniques (if applicable)
+            2. Alternative ingredient suggestions
+            3. Nutrition estimates per serving
+            4. Cooking time breakdown
+            
+            Recipe:
+            Title: {raw_recipe_dict.get('title', 'Unknown')}
+            Summary: {raw_recipe_dict.get('summary', '')[:200]}
+            
+            Return JSON with fields: cooking_tips, alternatives, estimated_nutrition (calories, protein, carbs, fat), prep_time, cook_time.
+            """
+            
+            response = self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional chef and nutritionist. Provide practical cooking advice and realistic nutrition estimates. Return valid JSON."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.5,
+                max_tokens=500
+            )
+            
+            response_text = response.choices[0].message.content.strip()
+            
+            # Try to parse JSON
+            if '{' in response_text:
+                json_str = response_text[response_text.index('{'):response_text.rindex('}')+1]
+                ai_enhancement = json.loads(json_str)
+                
+                # Merge with original recipe
+                raw_recipe_dict['ai_enhancements'] = ai_enhancement
+                return raw_recipe_dict
+        except Exception as e:
+            print(f"[WARN] Recipe enhancement failed: {e}")
+        
+        return raw_recipe_dict
 

@@ -22,6 +22,9 @@ class Config:
     
     # Spoonacular API (backup)
     SPOONACULAR_API_KEY = os.getenv('SPOONACULAR_API_KEY', '')
+    # Edamam Nutrition Analysis API
+    EDAMAM_APP_ID = os.getenv('EDAMAM_APP_ID', '')
+    EDAMAM_APP_KEY = os.getenv('EDAMAM_APP_KEY', '')
     
     # Rate limiting
     RATELIMIT_ENABLED = True

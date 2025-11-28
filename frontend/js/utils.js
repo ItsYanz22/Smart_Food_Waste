@@ -1,89 +1,139 @@
 /**
- * Utility functions
+ * Utility helpers shared across the frontend
  */
 
-/**
- * Get token from localStorage
- */
+(function establishApiBase() {
+    if (typeof window === 'undefined') return;
+    // Only set if not already set (allows HTML to override)
+    if (!window.API_BASE_URL) {
+        const defaultBase = 'http://localhost:5000/api';
+        window.API_BASE_URL = defaultBase;
+    }
+})();
+
+// Use window.API_BASE_URL, don't declare a const that might conflict
+// Other files should use window.API_BASE_URL directly or get it from here
+if (typeof window !== 'undefined' && !window.__API_BASE_SET__) {
+    window.__API_BASE_SET__ = true;
+}
+
 function getToken() {
-    return localStorage.getItem('access_token');
+    try {
+        return localStorage.getItem('access_token') || null;
+    } catch (error) {
+        console.warn('Unable to read access token from storage', error);
+        return null;
+    }
 }
 
-/**
- * Set token in localStorage
- */
 function setToken(token) {
-    localStorage.setItem('access_token', token);
+    try {
+        if (token) {
+            localStorage.setItem('access_token', token);
+        } else {
+            localStorage.removeItem('access_token');
+        }
+    } catch (error) {
+        console.warn('Unable to persist access token', error);
+    }
 }
 
-/**
- * Remove token from localStorage
- */
 function removeToken() {
-    localStorage.removeItem('access_token');
+    try {
+        localStorage.removeItem('access_token');
+    } catch (error) {
+        console.warn('Unable to remove access token', error);
+    }
 }
 
-/**
- * Get current user from localStorage
- */
 function getCurrentUser() {
-    const userStr = localStorage.getItem('current_user');
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+        const userStr = localStorage.getItem('current_user');
+        return userStr ? JSON.parse(userStr) : null;
+    } catch (error) {
+        console.warn('Unable to read current user', error);
+        return null;
+    }
 }
 
-/**
- * Set current user in localStorage
- */
 function setCurrentUser(user) {
-    localStorage.setItem('current_user', JSON.stringify(user));
+    try {
+        if (user) {
+            localStorage.setItem('current_user', JSON.stringify(user));
+        } else {
+            localStorage.removeItem('current_user');
+        }
+    } catch (error) {
+        console.warn('Unable to persist current user', error);
+    }
 }
 
-/**
- * Remove current user from localStorage
- */
 function removeCurrentUser() {
-    localStorage.removeItem('current_user');
+    try {
+        localStorage.removeItem('current_user');
+    } catch (error) {
+        console.warn('Unable to remove current user', error);
+    }
 }
 
-/**
- * Show error message
- */
 function showError(message) {
     const errorDiv = document.getElementById('error-message');
-    if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-        
-        // Hide after 5 seconds
-        setTimeout(() => {
+    if (!errorDiv) return;
+    
+    // Remove success class if present
+    errorDiv.classList.remove('success-message');
+    errorDiv.classList.add('error-message');
+    
+    // Format message with better visibility
+    errorDiv.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 10px;">
+            <span style="font-size: 18px; flex-shrink: 0;">❌</span>
+            <div style="flex: 1;">
+                <strong>Error:</strong><br/>
+                ${message.replace(/\n/g, '<br/>')}
+            </div>
+            <button onclick="this.parentElement.parentElement.style.display='none'" style="background: none; border: none; cursor: pointer; font-size: 20px; flex-shrink: 0;">✕</button>
+        </div>
+    `;
+    errorDiv.style.display = 'block';
+    
+    // Auto-hide after 8 seconds, but allow manual close
+    setTimeout(() => {
+        if (errorDiv.style.display !== 'none') {
             errorDiv.style.display = 'none';
-        }, 5000);
-    }
+        }
+    }, 8000);
 }
 
-/**
- * Show success message
- */
 function showSuccess(message) {
     const errorDiv = document.getElementById('error-message');
-    if (errorDiv) {
-        errorDiv.classList.remove('error-message');
-        errorDiv.classList.add('success-message');
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-
-        setTimeout(() => {
+    if (!errorDiv) return;
+    
+    // Remove error class if present
+    errorDiv.classList.remove('error-message');
+    errorDiv.classList.add('success-message');
+    
+    // Format message with better visibility
+    errorDiv.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 10px;">
+            <span style="font-size: 18px; flex-shrink: 0;">✅</span>
+            <div style="flex: 1;">
+                <strong>Success:</strong><br/>
+                ${message.replace(/\n/g, '<br/>')}
+            </div>
+            <button onclick="this.parentElement.parentElement.style.display='none'" style="background: none; border: none; cursor: pointer; font-size: 20px; flex-shrink: 0;">✕</button>
+        </div>
+    `;
+    errorDiv.style.display = 'block';
+    
+    // Auto-hide after 6 seconds
+    setTimeout(() => {
+        if (errorDiv.style.display !== 'none') {
             errorDiv.style.display = 'none';
-            errorDiv.classList.remove('success-message');
-            errorDiv.classList.add('error-message');
-        }, 5000);
-    }
+        }
+    }, 6000);
 }
 
-
-/**
- * Show loading indicator
- */
 function showLoading() {
     const loadingDiv = document.getElementById('loading');
     if (loadingDiv) {
@@ -91,9 +141,6 @@ function showLoading() {
     }
 }
 
-/**
- * Hide loading indicator
- */
 function hideLoading() {
     const loadingDiv = document.getElementById('loading');
     if (loadingDiv) {
@@ -101,9 +148,6 @@ function hideLoading() {
     }
 }
 
-/**
- * Format date
- */
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -112,4 +156,3 @@ function formatDate(dateString) {
         day: 'numeric'
     });
 }
-

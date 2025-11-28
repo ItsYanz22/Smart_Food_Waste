@@ -2,6 +2,25 @@
  * Main application logic
  */
 
+// Suppress third-party library errors (quillbot, etc)
+window.addEventListener('error', (event) => {
+  if (event.filename && (event.filename.includes('quillbot') || event.filename.includes('quill'))) {
+    // Suppress Quill library errors - they won't affect our app
+    event.preventDefault();
+    return true;
+  }
+});
+
+// Suppress unhandled promise rejections from third-party libraries
+window.addEventListener('unhandledrejection', (event) => {
+  if (event.reason && event.reason.message && 
+      event.reason.message.includes('updateCopyPasteInfo')) {
+    // Suppress Quill clipboard errors
+    event.preventDefault();
+    return true;
+  }
+});
+
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
@@ -28,15 +47,34 @@ function showSectionAnimated(sectionName) {
  * Check if user is authenticated
  */
 function checkAuth() {
+    if (typeof getToken !== 'function') {
+        return;
+    }
     const token = getToken();
     const user = getCurrentUser();
+    const appSection = document.getElementById('app-section');
+    const authSection = document.getElementById('auth-section');
+    const onDashboard = window.location.pathname.toLowerCase().includes('dashboard.html');
     
+    if (!appSection && !authSection && !onDashboard) {
+        // Landing or other page that doesn't use the app shell
+        return;
+    }
+
     if (token && user) {
         // User is logged in
-        showApp();
+        if (appSection) {
+            showApp();
+        }
     } else {
-        // User is not logged in
-        showAuth();
+        if (onDashboard) {
+            window.location.replace('login.html');
+            return;
+        }
+        // User is not logged in but page has auth/app shells
+        if (authSection) {
+            showAuth();
+        }
     }
 }
 
@@ -44,16 +82,37 @@ function checkAuth() {
  * Show authentication section
  */
 function showAuth() {
-    document.getElementById('auth-section').style.display = 'block';
-    document.getElementById('app-section').style.display = 'none';
+    const authSection = document.getElementById('auth-section');
+    const appSection = document.getElementById('app-section');
+    const landingShell = document.getElementById('landing-shell');
+    if (authSection) authSection.style.display = 'block';
+    if (appSection) appSection.style.display = 'none';
+    if (landingShell) landingShell.style.display = '';
+    if (landingShell) {
+        document.body.classList.remove('app-active');
+        // Only drop theme class if we're on the landing page with a shell
+        if (!window.location.pathname.toLowerCase().includes('dashboard.html')) {
+            document.body.classList.remove('dashboard-theme');
+        }
+    }
 }
 
 /**
  * Show app section
  */
 function showApp() {
-    document.getElementById('auth-section').style.display = 'none';
-    document.getElementById('app-section').style.display = 'block';
+    const authSection = document.getElementById('auth-section');
+    const appSection = document.getElementById('app-section');
+    const landingShell = document.getElementById('landing-shell');
+    if (authSection) authSection.style.display = 'none';
+    if (landingShell) landingShell.style.display = 'none';
+    if (!document.body.classList.contains('dashboard-theme')) {
+        document.body.classList.add('dashboard-theme');
+    }
+    document.body.classList.add('app-active');
+    if (appSection) {
+        appSection.style.display = 'block';
+    }
     
     // Show welcome message with username
     const user = getCurrentUser();
@@ -61,6 +120,19 @@ function showApp() {
         const welcomeText = document.getElementById('welcome-text');
         if (welcomeText) {
             welcomeText.textContent = `Welcome Back, ${user.username}!`;
+        }
+    }
+
+    if (!showApp._initialized) {
+        showApp._initialized = true;
+        if (typeof showSection === 'function') {
+            showSection('search');
+        }
+        if (typeof loadGroceryLists === 'function') {
+            loadGroceryLists();
+        }
+        if (typeof loadProfile === 'function') {
+            loadProfile();
         }
     }
 }
@@ -214,6 +286,14 @@ async function handleRegister(e) {
 async function handleDishSearch(e) {
     e.preventDefault();
     
+    // Ensure dishAPI is available
+    if (typeof window.dishAPI === 'undefined' || !window.dishAPI) {
+        console.error('dishAPI is not available. Make sure api.js is loaded.');
+        showError('🔴 API not loaded. Please refresh the page.');
+        return;
+    }
+    
+    const dishAPI = window.dishAPI;
     const dishName = document.getElementById('dish-name').value.trim();
     
     if (!dishName) {
@@ -223,17 +303,57 @@ async function handleDishSearch(e) {
     
     try {
         showLoading();
-        document.getElementById('recipe-results').style.display = 'none';
-        document.getElementById('error-message').style.display = 'none';
+        const resultsContainer = document.getElementById('recipe-results');
+        const placeholder = document.getElementById('recipe-hint');
+        if (resultsContainer) resultsContainer.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'none';
+        if (document.getElementById('error-message')) {
+            document.getElementById('error-message').style.display = 'none';
+        }
         
         const result = await dishAPI.search(dishName);
         
-        displayRecipeResults(result);
-        showSuccess('Recipe found! Ingredients have been saved to the database.');
+        // Check if we got a valid result (even if it's a fallback)
+        if (result && result.recipe) {
+            if (typeof displayRecipeResults === 'function') {
+                displayRecipeResults(result);
+            }
+            
+            // Check if the recipe has meaningful data
+            const hasIngredients = result.recipe.ingredients && result.recipe.ingredients.length > 1;
+            const hasInstructions = result.recipe.instructions && result.recipe.instructions.length > 0;
+            
+            if (hasIngredients && hasInstructions) {
+                showSuccess(`✅ Perfect! Found recipe for "${dishName}" with complete ingredients and instructions.`);
+            } else if (hasIngredients) {
+                showSuccess(`✅ Found "${dishName}" with ${result.recipe.ingredients.length} ingredients. Instructions may be limited.`);
+            } else {
+                showError(`⚠️ Recipe structure created for "${dishName}", but detailed ingredients couldn't be found. Try entering a recipe URL from a cooking website instead.`);
+            }
+        } else {
+            throw new Error('Unable to fetch recipe. Please try again or use a recipe URL from a cooking website.');
+        }
     } catch (error) {
-        showError(error.message || 'Recipe not found. Please try a different dish name.');
+        console.error('Dish search error:', error);
+        
+        if (typeof showError === 'function') {
+            let errorMsg = error.message || 'Unable to fetch recipe details. ';
+            
+            // Provide helpful suggestions
+            if (errorMsg.includes('Could not extract') || errorMsg.includes('Unable to')) {
+                errorMsg += '\n\n💡 Suggestions:\n• Try a more specific dish name (e.g., "Chicken Biryani" instead of just "Biryani")\n• Or paste a recipe URL from a cooking website (AllRecipes, Food.com, etc.)';
+            }
+            
+            showError(errorMsg);
+        }
+        
+        if (typeof showRecipeHint === 'function') {
+            showRecipeHint();
+        }
     } finally {
-        hideLoading();
+        if (typeof hideLoading === 'function') {
+            hideLoading();
+        }
     }
 }
 
@@ -243,6 +363,14 @@ async function handleDishSearch(e) {
 async function handleRecipeUrl(e) {
     e.preventDefault();
     
+    // Ensure dishAPI is available
+    if (typeof window.dishAPI === 'undefined' || !window.dishAPI) {
+        console.error('dishAPI is not available. Make sure api.js is loaded.');
+        showError('🔴 API not loaded. Please refresh the page.');
+        return;
+    }
+    
+    const dishAPI = window.dishAPI;
     const recipeUrl = document.getElementById('recipe-url').value.trim();
     
     if (!recipeUrl) {
@@ -254,23 +382,47 @@ async function handleRecipeUrl(e) {
     try {
         new URL(recipeUrl);
     } catch (error) {
-        showError('Please enter a valid URL');
+        showError('Please enter a valid URL (e.g., https://example.com/recipe)');
         return;
     }
     
     try {
         showLoading();
-        document.getElementById('recipe-results').style.display = 'none';
-        document.getElementById('error-message').style.display = 'none';
+        const resultsContainer = document.getElementById('recipe-results');
+        const placeholder = document.getElementById('recipe-hint');
+        if (resultsContainer) resultsContainer.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'none';
+        if (document.getElementById('error-message')) {
+            document.getElementById('error-message').style.display = 'none';
+        }
         
         const result = await dishAPI.extractFromUrl(recipeUrl);
         
-        displayRecipeResults(result);
-        showSuccess('Recipe extracted! Ingredients have been saved to the database.');
+        if (typeof displayRecipeResults === 'function') {
+            displayRecipeResults(result);
+        }
+        if (typeof showSuccess === 'function') {
+            showSuccess('✅ Recipe extracted successfully! Ingredients and instructions have been extracted. Review and save if you want to keep this recipe.');
+        }
     } catch (error) {
-        showError(error.message || 'Could not extract recipe from URL. Please try a different URL.');
+        console.error('Recipe URL extraction error:', error);
+        if (typeof showError === 'function') {
+            let errorMsg = error.message || 'Could not extract recipe from URL. ';
+            
+            // Provide suggestions
+            if (errorMsg.includes('Could not extract') || errorMsg.includes('timeout')) {
+                errorMsg += '\n\n💡 Tips:\n• Make sure the URL is correct and accessible\n• Try URLs from popular cooking sites like AllRecipes, Food.com, or BBC Good Food\n• The website may block automated access - try a different recipe URL';
+            }
+            
+            showError(errorMsg);
+        }
+        if (typeof showRecipeHint === 'function') {
+            showRecipeHint();
+        }
     } finally {
-        hideLoading();
+        if (typeof hideLoading === 'function') {
+            hideLoading();
+        }
     }
 }
 
@@ -405,7 +557,85 @@ async function handleProfileUpdate(e) {
 window.logout = function() {
     removeToken();
     removeCurrentUser();
-    showAuth();
-    showSuccess('Logged out successfully');
+    
+    // Reset expiry popup counter for next session
+    if (typeof sessionStorage !== 'undefined') {
+        const today = new Date().toDateString();
+        const key = 'expiryPopupCount_' + today;
+        sessionStorage.removeItem(key);
+        console.log('🔄 Expiry popup counter reset on logout');
+    }
+    
+    const authSection = document.getElementById('auth-section');
+    const landingShell = document.getElementById('landing-shell');
+    const appSection = document.getElementById('app-section');
+    if (landingShell) {
+        if (appSection) {
+            appSection.style.display = 'none';
+        }
+        showAuth();
+        showSuccess('Logged out successfully');
+        // Redirect to landing page after short delay
+        setTimeout(() => {
+            window.location.replace('index.html');
+        }, 1500);
+        return;
+    }
+    if (authSection) {
+        showAuth();
+        showSuccess('Logged out successfully');
+    }
+    // Redirect to landing page
+    setTimeout(() => {
+        window.location.replace('index.html');
+    }, 1500);
 }
 
+// main.js (defer included in index.html)
+document.addEventListener('DOMContentLoaded', () => {
+  const ctaExplore = document.getElementById('ctaExplore');
+  const videoSection = document.getElementById('video-section');
+  const ctaToApp = document.getElementById('ctaToApp');
+
+  if(ctaExplore){
+    ctaExplore.addEventListener('click', () => {
+      videoSection.scrollIntoView({behavior: 'smooth'});
+    });
+  }
+
+  if(ctaToApp){
+    ctaToApp.addEventListener('click', () => {
+      // scroll to bottom anchor (app)
+      document.getElementById('app-anchor').scrollIntoView({behavior:'smooth'});
+    });
+  }
+
+  // Improve mobile autoplay behavior; ensure video starts muted & looped
+  const v = document.getElementById('foodVideo');
+  if(v){
+    v.muted = true;
+    v.loop = true;
+    v.play().catch(()=>{ /* autoplay blocked - user will manually interact */ });
+  }
+});
+
+
+// main.js - global bootstrap
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Make sure dashboard nav gets initialized without touching landing links
+  const firstNav = document.querySelector('.nav-btn[data-target]');
+  if (firstNav) firstNav.classList.add('active');
+
+  // keyboard shortcuts for quick testing
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '1') document.querySelector('[data-target="search-section"]').click();
+    if (e.key === '2') document.querySelector('[data-target="lists-section"]').click();
+    if (e.key === '3') document.querySelector('[data-target="profile-section"]').click();
+  });
+
+  // make focus visible for keyboard users
+  document.addEventListener('keyup', (e) => {
+    if (e.key === 'Tab') document.body.classList.add('show-focus');
+  });
+});

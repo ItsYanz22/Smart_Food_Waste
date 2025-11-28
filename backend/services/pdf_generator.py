@@ -9,6 +9,18 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+# Try to register fonts that support Hindi/Unicode
+try:
+    # Use system fonts that support Unicode (Hindi)
+    from reportlab.pdfbase.pdfmetrics import registerFontFamily
+    # ReportLab's built-in fonts support basic Unicode
+    # For better Hindi support, you may need to install and register a Hindi font
+    pass
+except:
+    pass
 
 
 class PDFGenerator:
@@ -114,11 +126,19 @@ class PDFGenerator:
                 for item in items_by_category[category]:
                     quantity = item.quantity or '1'
                     unit = item.unit or ''
+                    # Ensure ingredient name is properly encoded for PDF (handles Hindi)
+                    ingredient_name = str(item.ingredient_name) if item.ingredient_name else ''
+                    # Clean any encoding issues
+                    try:
+                        ingredient_name = ingredient_name.encode('utf-8', errors='ignore').decode('utf-8')
+                    except:
+                        pass
+                    
                     table_data.append([
                         category.title(),
-                        item.ingredient_name,
-                        quantity,
-                        unit
+                        ingredient_name,
+                        str(quantity),
+                        str(unit) if unit else ''
                     ])
         
         # Create table
@@ -245,6 +265,44 @@ class PDFGenerator:
             else:
                 story.append(Paragraph("No instructions available.", styles['Normal']))
             
+            # Nutrition Information (after instructions)
+            if recipe.nutrition:
+                story.append(Spacer(1, 0.3*inch))
+                story.append(Paragraph("Nutrition Information", heading_style))
+                
+                nutrition = recipe.nutrition
+                nutrition_data = []
+                
+                # Main nutrients
+                if nutrition.get('calories'):
+                    nutrition_data.append(['Calories', f"{int(nutrition.get('calories', 0))} kcal"])
+                if nutrition.get('protein'):
+                    nutrition_data.append(['Protein', f"{nutrition.get('protein', 0):.1f} g"])
+                if nutrition.get('fat'):
+                    nutrition_data.append(['Fat', f"{nutrition.get('fat', 0):.1f} g"])
+                if nutrition.get('carbs'):
+                    nutrition_data.append(['Carbohydrates', f"{nutrition.get('carbs', 0):.1f} g"])
+                if nutrition.get('fiber'):
+                    nutrition_data.append(['Fiber', f"{nutrition.get('fiber', 0):.1f} g"])
+                if nutrition.get('sugar'):
+                    nutrition_data.append(['Sugar', f"{nutrition.get('sugar', 0):.1f} g"])
+                if nutrition.get('sodium'):
+                    nutrition_data.append(['Sodium', f"{int(nutrition.get('sodium', 0))} mg"])
+                
+                if nutrition_data:
+                    nutrition_table = Table(nutrition_data, colWidths=[3*inch, 3*inch])
+                    nutrition_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ecf0f1')),
+                        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 11),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')])
+                    ]))
+                    story.append(nutrition_table)
+            
             # Build PDF
             doc.build(story)
             
@@ -337,10 +395,17 @@ class PDFGenerator:
                         for item in items_by_category[category]:
                             quantity = item.quantity or '1'
                             unit = item.unit or ''
+                            # Ensure ingredient name is properly encoded for PDF (handles Hindi)
+                            ingredient_name = str(item.name) if item.name else ''
+                            try:
+                                ingredient_name = ingredient_name.encode('utf-8', errors='ignore').decode('utf-8')
+                            except:
+                                pass
+                            
                             table_data.append([
-                                item.name,
-                                quantity,
-                                unit,
+                                ingredient_name,
+                                str(quantity),
+                                str(unit) if unit else '',
                                 category.title()
                             ])
                 
@@ -348,10 +413,16 @@ class PDFGenerator:
                 if 'other' not in items_by_category:
                     for ing in recipe.ingredients:
                         if not ing.category:
+                            ingredient_name = str(ing.name) if ing.name else ''
+                            try:
+                                ingredient_name = ingredient_name.encode('utf-8', errors='ignore').decode('utf-8')
+                            except:
+                                pass
+                            
                             table_data.append([
-                                ing.name,
-                                ing.quantity or '1',
-                                ing.unit or '',
+                                ingredient_name,
+                                str(ing.quantity) if ing.quantity else '1',
+                                str(ing.unit) if ing.unit else '',
                                 'Other'
                             ])
                 
